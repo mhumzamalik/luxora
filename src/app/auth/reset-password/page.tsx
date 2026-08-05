@@ -1,0 +1,116 @@
+"use client";
+
+import React, { useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Header } from "@/components/layout/Header";
+import { Footer } from "@/components/layout/Footer";
+import { Lock, ArrowRight } from "lucide-react";
+import { useToast } from "@/components/ui/ToastProvider";
+import { fetchApi } from "@/lib/api-client";
+
+export default function ResetPasswordPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token") || "";
+  const email = searchParams.get("email") || "";
+
+  const { error: toastError, success: toastSuccess } = useToast();
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password !== confirmPassword) {
+      toastError("Error", "Passwords do not match");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await fetchApi("/api/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ email, token, password }),
+      });
+      toastSuccess("Success", "Password reset successfully. Please sign in.");
+      router.push("/auth/login");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to reset password";
+      toastError("Reset Failed", msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col bg-[#FAFAFA]">
+      <Header />
+
+      <main className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-md bg-white border border-gray-100 p-8 rounded-3xl shadow-xl space-y-6">
+          <div className="text-center space-y-2">
+            <h1 className="text-2xl font-serif font-extrabold text-gray-900">
+              Reset Your Password
+            </h1>
+            <p className="text-xs text-gray-500">
+              Enter a new secure password for {email || "your account"}.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            <div>
+              <label className="font-bold text-gray-700 block mb-1">New Password</label>
+              <div className="relative">
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 pl-9 outline-hidden focus:border-black transition"
+                />
+                <Lock size={16} className="absolute left-3 top-3.5 text-gray-400" />
+              </div>
+            </div>
+
+            <div>
+              <label className="font-bold text-gray-700 block mb-1">Confirm New Password</label>
+              <div className="relative">
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 pl-9 outline-hidden focus:border-black transition"
+                />
+                <Lock size={16} className="absolute left-3 top-3.5 text-gray-400" />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-black hover:bg-gray-800 text-white font-bold py-3.5 rounded-xl shadow-md transition flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isLoading ? "Resetting Password..." : "Update Password"}
+              <ArrowRight size={16} />
+            </button>
+          </form>
+
+          <p className="text-xs text-center text-gray-500">
+            Back to{" "}
+            <Link href="/auth/login" className="font-bold text-black hover:underline">
+              Sign In
+            </Link>
+          </p>
+        </div>
+      </main>
+
+      <Footer />
+    </div>
+  );
+}
