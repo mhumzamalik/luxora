@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -40,13 +40,22 @@ function ProductsContent() {
   const isNewArrival = searchParams.get("isNewArrival") === "true";
 
   const [maxPrice, setMaxPrice] = useState<number>(100000);
+  const [debouncedMaxPrice, setDebouncedMaxPrice] = useState<number>(100000);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedMaxPrice(maxPrice);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [maxPrice]);
 
   const queryKey = [
     "products",
     categoryParam,
     searchParam,
     sortParam,
-    maxPrice,
+    debouncedMaxPrice,
     pageParam,
     isFlashSale,
     isBestSeller,
@@ -60,7 +69,7 @@ function ProductsContent() {
       if (categoryParam && categoryParam !== "all") params.set("category", categoryParam);
       if (searchParam) params.set("search", searchParam);
       if (sortParam) params.set("sortBy", sortParam);
-      if (maxPrice) params.set("maxPrice", maxPrice.toString());
+      if (debouncedMaxPrice) params.set("maxPrice", debouncedMaxPrice.toString());
       if (isFlashSale) params.set("isFlashSale", "true");
       if (isBestSeller) params.set("isBestSeller", "true");
       if (isNewArrival) params.set("isNewArrival", "true");
@@ -72,6 +81,7 @@ function ProductsContent() {
         pagination: { total: number; page: number; limit: number; totalPages: number };
       }>(`/api/products?${params.toString()}`);
     },
+    placeholderData: (previousData) => previousData,
   });
 
   const updateUrlParam = (key: string, value: string) => {
