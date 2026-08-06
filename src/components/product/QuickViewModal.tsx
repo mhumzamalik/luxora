@@ -6,11 +6,14 @@ import { X, Star, ShoppingBag, Heart } from "lucide-react";
 import { useQuickViewStore } from "@/store/quick-view-store";
 import { useCartStore } from "@/store/cart-store";
 import { useWishlistStore } from "@/store/wishlist-store";
+import { formatCurrency } from "@/lib/currency";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export function QuickViewModal() {
   const { product, isOpen, closeQuickView } = useQuickViewStore();
   const cartStore = useCartStore();
   const wishlistStore = useWishlistStore();
+  const { success: toastSuccess } = useToast();
 
   const [quantity] = useState(1);
   const [selectedColor, setSelectedColor] = useState<string | undefined>(
@@ -36,6 +39,7 @@ export function QuickViewModal() {
       },
       quantity
     );
+    toastSuccess("Added to Bag", `${product.name} has been added to your shopping bag.`);
     closeQuickView();
   };
 
@@ -102,11 +106,11 @@ export function QuickViewModal() {
               {/* Price */}
               <div className="flex items-baseline space-x-2 mt-3">
                 <span className="text-2xl font-extrabold text-gray-900">
-                  ${product.price.toFixed(2)}
+                  {formatCurrency(product.price)}
                 </span>
                 {product.comparePrice && (
                   <span className="text-sm text-gray-400 line-through">
-                    ${product.comparePrice.toFixed(2)}
+                    {formatCurrency(product.comparePrice)}
                   </span>
                 )}
               </div>

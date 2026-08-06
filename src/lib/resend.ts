@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { Logger } from "./logger";
+import { formatCurrency } from "./currency";
 
 const resendApiKey = process.env.RESEND_API_KEY;
 export const resend = resendApiKey ? new Resend(resendApiKey) : null;
@@ -35,9 +36,9 @@ export async function sendOrderConfirmationEmail(params: {
           <p><strong>Bank Reference:</strong> ${params.bankReference}</p>
           <h3>Order Items</h3>
           <ul>
-            ${params.items.map((item) => `<li>${item.quantity}x ${item.name} - $${item.price.toFixed(2)}</li>`).join("")}
+            ${params.items.map((item) => `<li>${item.quantity}x ${item.name} - ${formatCurrency(item.price)}</li>`).join("")}
           </ul>
-          <p style="font-size: 18px; font-weight: bold;">Total Paid: $${params.totalAmount.toFixed(2)}</p>
+          <p style="font-size: 18px; font-weight: bold;">Total Paid: ${formatCurrency(params.totalAmount)}</p>
           <hr style="border: 0; border-top: 1px solid #eee;" />
           <p style="color: #666; font-size: 12px;">If you have any questions, reply to this email or visit our Help Center.</p>
         </div>

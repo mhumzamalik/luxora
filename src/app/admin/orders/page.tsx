@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CheckCircle2, Clock, Eye, Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api-client";
+import { formatCurrency } from "@/lib/currency";
 
 interface AdminOrder {
   id: string;
@@ -126,7 +127,7 @@ export default function AdminOrdersPage() {
                     <div className="text-[11px] text-gray-500">{order.user?.email || order.guestEmail}</div>
                   </td>
                   <td className="p-4 font-mono text-purple-400 font-bold">{order.bankReference}</td>
-                  <td className="p-4 font-extrabold text-white">${order.total.toFixed(2)}</td>
+                  <td className="p-4 font-extrabold text-white">{formatCurrency(order.total)}</td>
                   <td className="p-4">
                     {order.paymentStatus === "PAID" ? (
                       <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-3 py-1 rounded-full inline-flex items-center gap-1">

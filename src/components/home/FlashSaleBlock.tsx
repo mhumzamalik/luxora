@@ -5,6 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Zap, ShoppingBag, ArrowRight } from "lucide-react";
 import { useCartStore } from "@/store/cart-store";
+import { formatCurrency } from "@/lib/currency";
+import { useToast } from "@/components/ui/ToastProvider";
 
 const flashSaleProducts = [
   {
@@ -46,14 +48,14 @@ const flashSaleProducts = [
 ];
 
 export function FlashSaleBlock() {
+  const cartStore = useCartStore();
+  const { success: toastSuccess } = useToast();
   const [timeLeft, setTimeLeft] = useState({
     hours: 2,
     minutes: 18,
     seconds: 34,
     ms: 56,
   });
-
-  const cartStore = useCartStore();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -155,16 +157,16 @@ export function FlashSaleBlock() {
                   </h4>
                   <div className="flex items-baseline space-x-1.5">
                     <span className="text-sm font-extrabold text-gray-900">
-                      ${item.price.toFixed(2)}
+                      {formatCurrency(item.price)}
                     </span>
                     <span className="text-[11px] text-gray-400 line-through">
-                      ${item.comparePrice.toFixed(2)}
+                      {formatCurrency(item.comparePrice)}
                     </span>
                   </div>
                 </div>
 
                 <button
-                  onClick={() =>
+                  onClick={() => {
                     cartStore.addItem({
                       id: item.id,
                       name: item.name,
@@ -172,8 +174,9 @@ export function FlashSaleBlock() {
                       price: item.price,
                       comparePrice: item.comparePrice,
                       image: item.image,
-                    })
-                  }
+                    });
+                    toastSuccess("Added to Bag", `${item.name} has been added to your shopping bag.`);
+                  }}
                   className="mt-3 w-full bg-gray-100 hover:bg-black hover:text-white text-gray-800 text-[11px] font-bold py-2 rounded-xl transition flex items-center justify-center gap-1"
                 >
                   <ShoppingBag size={12} />

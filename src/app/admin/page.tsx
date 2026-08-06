@@ -15,6 +15,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { formatCurrency } from "@/lib/currency";
 
 interface AdminStats {
   totalRevenue: number;
@@ -46,7 +47,7 @@ export default function AdminDashboardPage() {
   const statCards = [
     {
       title: "Total Revenue",
-      value: stats ? `$${stats.totalRevenue.toFixed(2)}` : "$0.00",
+      value: stats ? formatCurrency(stats.totalRevenue) : formatCurrency(0),
       change: "Live Revenue Metrics",
       icon: DollarSign,
       color: "bg-emerald-500/20 text-emerald-400",
@@ -164,7 +165,7 @@ export default function AdminDashboardPage() {
                     <td className="p-3.5 font-mono font-bold text-white">{order.orderNumber}</td>
                     <td className="p-3.5">{order.user?.name || order.guestEmail || "Guest"}</td>
                     <td className="p-3.5 font-mono text-purple-400 font-bold">{order.bankReference}</td>
-                    <td className="p-3.5 font-bold text-white">${order.total.toFixed(2)}</td>
+                    <td className="p-3.5 font-bold text-white">{formatCurrency(order.total)}</td>
                     <td className="p-3.5">
                       {order.paymentStatus === "PAID" ? (
                         <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2.5 py-1 rounded-full inline-flex items-center gap-1">

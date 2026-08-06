@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Plus, Search, Trash2, Loader2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api-client";
+import { formatCurrency } from "@/lib/currency";
 
 interface AdminProduct {
   id: string;
@@ -116,7 +117,7 @@ export default function AdminProductsPage() {
                       </div>
                     </td>
                     <td className="p-4 text-gray-400">{prod.category?.name || "General"}</td>
-                    <td className="p-4 font-bold text-white">${prod.price.toFixed(2)}</td>
+                    <td className="p-4 font-bold text-white">{formatCurrency(prod.price)}</td>
                     <td className="p-4">
                       <span
                         className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${

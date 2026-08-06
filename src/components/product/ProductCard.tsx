@@ -7,6 +7,9 @@ import { Heart, Star, ShoppingBag, Eye } from "lucide-react";
 import { useCartStore, CartProduct } from "@/store/cart-store";
 import { useWishlistStore } from "@/store/wishlist-store";
 import { useQuickViewStore, QuickViewProduct } from "@/store/quick-view-store";
+import { formatCurrency } from "@/lib/currency";
+
+import { useToast } from "@/components/ui/ToastProvider";
 
 export interface ProductCardProps {
   product: {
@@ -30,6 +33,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const cartStore = useCartStore();
   const wishlistStore = useWishlistStore();
   const quickViewStore = useQuickViewStore();
+  const { success: toastSuccess } = useToast();
 
   const primaryImage =
     product.images?.find((img) => img.isPrimary)?.url ||
@@ -81,6 +85,7 @@ export function ProductCard({ product }: ProductCardProps) {
     e.preventDefault();
     e.stopPropagation();
     cartStore.addItem(cartProduct, 1);
+    toastSuccess("Added to Bag", `${product.name} has been added to your shopping bag.`);
   };
 
   return (
@@ -165,11 +170,11 @@ export function ProductCard({ product }: ProductCardProps) {
           {/* Pricing */}
           <div className="flex items-baseline space-x-2 pt-1">
             <span className="text-sm md:text-base font-extrabold text-gray-900">
-              ${product.price.toFixed(2)}
+              {formatCurrency(product.price)}
             </span>
             {product.comparePrice && (
               <span className="text-xs text-gray-400 line-through font-normal">
-                ${product.comparePrice.toFixed(2)}
+                {formatCurrency(product.comparePrice)}
               </span>
             )}
           </div>

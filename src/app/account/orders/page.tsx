@@ -9,6 +9,7 @@ import { fetchApi } from "@/lib/api-client";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Package, ExternalLink } from "lucide-react";
+import { formatCurrency } from "@/lib/currency";
 
 interface UserOrderItem {
   id: string;
@@ -80,7 +81,7 @@ export default function AccountOrdersPage() {
                   </div>
                   <div>
                     <span className="text-xs text-gray-400 block">Total</span>
-                    <span className="text-xs font-extrabold text-gray-900">${order.total.toFixed(2)}</span>
+                    <span className="text-xs font-extrabold text-gray-900">{formatCurrency(order.total)}</span>
                   </div>
                   <div>
                     <span className="text-[10px] font-extrabold uppercase px-3 py-1 rounded-full bg-gray-100 text-gray-800">
@@ -100,9 +101,9 @@ export default function AccountOrdersPage() {
                     <div key={item.id} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between text-xs">
                       <div>
                         <p className="font-bold text-gray-900">{item.product?.name}</p>
-                        <p className="text-gray-500">Qty: {item.quantity} x ${item.unitPrice.toFixed(2)}</p>
+                        <p className="text-gray-500">Qty: {item.quantity} x {formatCurrency(item.unitPrice)}</p>
                       </div>
-                      <span className="font-bold text-gray-900">${item.totalPrice.toFixed(2)}</span>
+                      <span className="font-bold text-gray-900">{formatCurrency(item.totalPrice)}</span>
                     </div>
                   ))}
                 </div>

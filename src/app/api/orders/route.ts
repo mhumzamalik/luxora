@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
 import { resend } from "@/lib/resend";
+import { formatCurrency } from "@/lib/currency";
 
 const orderItemSchema = z.object({
   productId: z.string().min(1),
@@ -219,12 +220,12 @@ export async function POST(req: Request) {
               <h2 style="color: #222;">Thank you for your order!</h2>
               <p>Order Number: <strong>${order.orderNumber}</strong></p>
               <p>Bank Reference: <strong>${order.bankReference}</strong></p>
-              <p>Total Amount: <strong>$${order.total.toFixed(2)}</strong></p>
+              <p>Total Amount: <strong>${formatCurrency(order.total)}</strong></p>
               <h3 style="margin-top: 24px;">Items Ordered:</h3>
               <ul>
                 ${order.items
                   .map(
-                    (i) => `<li>${i.product.name} x ${i.quantity} - $${i.totalPrice.toFixed(2)}</li>`
+                    (i) => `<li>${i.product.name} x ${i.quantity} - ${formatCurrency(i.totalPrice)}</li>`
                   )
                   .join("")}
               </ul>

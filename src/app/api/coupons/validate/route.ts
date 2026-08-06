@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { formatCurrency } from "@/lib/currency";
 
 const validateCouponSchema = z.object({
   code: z.string().min(1, "Coupon code is required"),
@@ -49,9 +50,7 @@ export async function POST(req: Request) {
     if (coupon.minOrderAmount && orderAmount < coupon.minOrderAmount) {
       return NextResponse.json(
         {
-          error: `Minimum order amount of $${coupon.minOrderAmount.toFixed(
-            2
-          )} required for this coupon`,
+          error: `Minimum order amount of ${formatCurrency(coupon.minOrderAmount)} required for this coupon`,
         },
         { status: 400 }
       );

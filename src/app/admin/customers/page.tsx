@@ -4,6 +4,7 @@ import React from "react";
 import { Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api-client";
+import { formatCurrency } from "@/lib/currency";
 
 interface Customer {
   id: string;
@@ -59,7 +60,7 @@ export default function AdminCustomersPage() {
                     <div className="text-[11px] text-gray-400">{cust.email}</div>
                   </td>
                   <td className="p-4 font-semibold text-purple-400">{cust._count.orders} orders</td>
-                  <td className="p-4 font-bold text-white">${cust.totalSpent.toFixed(2)}</td>
+                  <td className="p-4 font-bold text-white">{formatCurrency(cust.totalSpent)}</td>
                   <td className="p-4 text-gray-400">
                     {new Date(cust.createdAt).toLocaleDateString()}
                   </td>

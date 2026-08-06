@@ -16,6 +16,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { ProductCard } from "@/components/product/ProductCard";
+import { formatCurrency } from "@/lib/currency";
 
 interface ProductReview {
   id: string;
@@ -243,9 +244,9 @@ export default function ProductDetailPage({
 
               {/* Price */}
               <div className="flex items-baseline space-x-3 pt-2">
-                <span className="text-3xl font-extrabold text-gray-900">${product.price.toFixed(2)}</span>
+                <span className="text-3xl font-extrabold text-gray-900">{formatCurrency(product.price)}</span>
                 {product.comparePrice && (
-                  <span className="text-sm text-gray-400 line-through">${product.comparePrice.toFixed(2)}</span>
+                  <span className="text-sm text-gray-400 line-through">{formatCurrency(product.comparePrice)}</span>
                 )}
                 {product.badge && (
                   <span className="bg-red-500 text-white text-xs font-extrabold px-2.5 py-0.5 rounded-full">

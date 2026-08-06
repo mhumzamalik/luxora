@@ -60,9 +60,9 @@ export const useCartStore = create<CartStore>()(
           if (existingIndex > -1) {
             const updatedItems = [...state.items];
             updatedItems[existingIndex].quantity += quantity;
-            return { items: updatedItems, isOpen: true };
+            return { items: updatedItems };
           } else {
-            return { items: [...state.items, { product, quantity }], isOpen: true };
+            return { items: [...state.items, { product, quantity }] };
           }
         });
       },

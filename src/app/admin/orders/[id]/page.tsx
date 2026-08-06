@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api-client";
+import { formatCurrency } from "@/lib/currency";
 
 interface ShippingAddress {
   addressLine1?: string;
@@ -158,7 +159,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               <div>
                 <span className="text-gray-400 block text-[10px]">Total Amount</span>
                 <span className="font-extrabold text-white text-sm">
-                  ${order.total.toFixed(2)}
+                  {formatCurrency(order.total)}
                 </span>
               </div>
             </div>
@@ -211,7 +212,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
                     <div className="text-[11px] text-gray-400">SKU: {item.variantSku || item.variant?.sku || "N/A"}</div>
                   </div>
                   <div className="text-right">
-                    <span className="font-bold text-white block">${item.price.toFixed(2)}</span>
+                    <span className="font-bold text-white block">{formatCurrency(item.price)}</span>
                     <span className="text-gray-400 text-[11px]">Qty: {item.quantity}</span>
                   </div>
                 </div>

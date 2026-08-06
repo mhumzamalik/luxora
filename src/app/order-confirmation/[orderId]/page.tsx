@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api-client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { formatCurrency } from "@/lib/currency";
 
 interface OrderItem {
   id: string;
@@ -142,7 +143,7 @@ export default function OrderConfirmationPage({
             <div className="h-6 w-px bg-gray-200" />
             <div>
               <span className="text-gray-400 block text-[10px]">Total Due</span>
-              <span className="font-bold text-gray-900">${order.total.toFixed(2)}</span>
+              <span className="font-bold text-gray-900">{formatCurrency(order.total)}</span>
             </div>
           </div>
         </div>
@@ -197,9 +198,9 @@ export default function OrderConfirmationPage({
                 <div key={item.id} className="py-2.5 first:pt-0 last:pb-0 flex justify-between text-xs">
                   <div>
                     <p className="font-bold text-gray-900">{item.product.name}</p>
-                    <p className="text-[11px] text-gray-500">Qty: {item.quantity} x ${item.unitPrice.toFixed(2)}</p>
+                    <p className="text-[11px] text-gray-500">Qty: {item.quantity} x {formatCurrency(item.unitPrice)}</p>
                   </div>
-                  <span className="font-bold text-gray-900">${item.totalPrice.toFixed(2)}</span>
+                  <span className="font-bold text-gray-900">{formatCurrency(item.totalPrice)}</span>
                 </div>
               ))}
             </div>

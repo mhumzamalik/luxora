@@ -10,6 +10,7 @@ import { fetchApi } from "@/lib/api-client";
 import { Package, Heart, MapPin, Settings, ShieldCheck } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
+import { formatCurrency } from "@/lib/currency";
 
 interface RecentOrderSummary {
   id: string;
@@ -133,7 +134,7 @@ export default function AccountPage() {
                       {new Date(ord.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <span className="font-extrabold text-gray-900">${ord.total.toFixed(2)}</span>
+                  <span className="font-extrabold text-gray-900">{formatCurrency(ord.total)}</span>
                   <span className="uppercase text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-gray-100 text-gray-800">
                     {ord.status}
                   </span>

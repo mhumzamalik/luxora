@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { X, Plus, Minus, Trash2, ShoppingBag, ArrowRight, Truck, Tag } from "lucide-react";
 import { useCartStore } from "@/store/cart-store";
+import { formatCurrency } from "@/lib/currency";
 
 export function CartDrawer() {
   const cartStore = useCartStore();
@@ -63,7 +64,7 @@ export function CartDrawer() {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between font-medium text-indigo-900">
                   <span className="flex items-center gap-1.5">
-                    <Truck size={15} className="text-indigo-600" /> Add ${amountToFreeShipping.toFixed(2)} for FREE Shipping
+                    <Truck size={15} className="text-indigo-600" /> Add {formatCurrency(amountToFreeShipping)} for FREE Shipping
                   </span>
                   <span>{progressPercent.toFixed(0)}%</span>
                 </div>
@@ -166,7 +167,7 @@ export function CartDrawer() {
                       </div>
 
                       <span className="text-sm font-extrabold text-gray-900">
-                        ${(item.product.price * item.quantity).toFixed(2)}
+                        {formatCurrency(item.product.price * item.quantity)}
                       </span>
                     </div>
                   </div>
@@ -217,23 +218,23 @@ export function CartDrawer() {
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
-                  <span className="font-semibold text-gray-900">${subtotal.toFixed(2)}</span>
+                  <span className="font-semibold text-gray-900">{formatCurrency(subtotal)}</span>
                 </div>
                 {cartStore.getDiscountAmount() > 0 && (
                   <div className="flex justify-between text-emerald-600 font-semibold">
                     <span>Discount</span>
-                    <span>-${cartStore.getDiscountAmount().toFixed(2)}</span>
+                    <span>-{formatCurrency(cartStore.getDiscountAmount())}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-gray-600">
                   <span>Shipping</span>
                   <span className="font-semibold text-gray-900">
-                    {cartStore.getShippingFee() === 0 ? "FREE" : `$${cartStore.getShippingFee().toFixed(2)}`}
+                    {cartStore.getShippingFee() === 0 ? "FREE" : formatCurrency(cartStore.getShippingFee())}
                   </span>
                 </div>
                 <div className="flex justify-between text-base font-extrabold text-gray-900 pt-2 border-t border-gray-100">
                   <span>Total</span>
-                  <span>${cartStore.getTotal().toFixed(2)}</span>
+                  <span>{formatCurrency(cartStore.getTotal())}</span>
                 </div>
               </div>
 

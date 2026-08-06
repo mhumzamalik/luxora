@@ -20,8 +20,9 @@ import {
 } from "lucide-react";
 import { useCartStore } from "@/store/cart-store";
 import { useWishlistStore } from "@/store/wishlist-store";
+import { formatCurrency } from "@/lib/currency";
 
-const emptySubscribe = () => () => {};
+const emptySubscribe = () => () => { };
 function useIsMounted() {
   return useSyncExternalStore(
     emptySubscribe,
@@ -84,16 +85,16 @@ export function Header() {
               <ChevronDown size={12} />
             </div>
             <div className="hidden sm:flex items-center space-x-1 cursor-pointer hover:text-black">
-              <span>USD $</span>
+              <span>PKR</span>
               <ChevronDown size={12} />
             </div>
-            <Link
-              href="/track-order"
-              className="hover:text-black flex items-center gap-1"
+            <div
+              className="flex items-center gap-1 text-gray-400 cursor-not-allowed opacity-60 select-none"
+              title="Coming Soon"
             >
               <Truck size={13} />
               <span>Track Order</span>
-            </Link>
+            </div>
             <Link
               href="/help"
               className="hidden sm:flex items-center gap-1 hover:text-black"
@@ -177,7 +178,7 @@ export function Header() {
                 Bag ({isMounted ? cartCount : 0})
               </span>
               <span className="text-xs font-bold text-gray-900">
-                ${isMounted ? cartSubtotal.toFixed(2) : "0.00"}
+                {isMounted ? formatCurrency(cartSubtotal) : formatCurrency(0)}
               </span>
             </div>
           </button>
@@ -275,11 +276,10 @@ export function Header() {
             <Link
               key={cat.name}
               href={cat.href}
-              className={`py-3 transition relative hover:text-black group ${
-                cat.isSale
-                  ? "text-red-500 font-bold hover:text-red-600"
-                  : "text-gray-700"
-              }`}
+              className={`py-3 transition relative hover:text-black group ${cat.isSale
+                ? "text-red-500 font-bold hover:text-red-600"
+                : "text-gray-700"
+                }`}
             >
               {cat.name}
               <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-black transition-all duration-200 group-hover:w-full"></span>
@@ -306,9 +306,8 @@ export function Header() {
               key={cat.name}
               href={cat.href}
               onClick={() => setMobileMenuOpen(false)}
-              className={`block py-2 text-sm font-medium ${
-                cat.isSale ? "text-red-500 font-bold" : "text-gray-800"
-              }`}
+              className={`block py-2 text-sm font-medium ${cat.isSale ? "text-red-500 font-bold" : "text-gray-800"
+                }`}
             >
               {cat.name}
             </Link>

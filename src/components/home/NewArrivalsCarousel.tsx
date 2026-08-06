@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, ChevronLeft, ChevronRight, Heart } from "lucide-react";
 import { useWishlistStore } from "@/store/wishlist-store";
+import { formatCurrency } from "@/lib/currency";
 
 const newArrivals = [
   {
@@ -166,7 +167,7 @@ export function NewArrivalsCarousel() {
                 {product.name}
               </Link>
               <span className="text-sm font-extrabold text-gray-900 block mt-1">
-                ${product.price.toFixed(2)}
+                {formatCurrency(product.price)}
               </span>
             </div>
           );

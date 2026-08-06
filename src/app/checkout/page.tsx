@@ -11,6 +11,7 @@ import { Landmark, Lock, Upload, CheckCircle2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { fetchApi } from "@/lib/api-client";
 import { useToast } from "@/components/ui/ToastProvider";
+import { formatCurrency } from "@/lib/currency";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -336,7 +337,7 @@ export default function CheckoutPage() {
               ) : (
                 <>
                   <Lock size={16} />
-                  <span>Complete Purchase — ${total.toFixed(2)}</span>
+                  <span>Complete Purchase — {formatCurrency(total)}</span>
                 </>
               )}
             </button>
@@ -359,7 +360,7 @@ export default function CheckoutPage() {
                     <span className="text-gray-500">Qty: {item.quantity}</span>
                   </div>
                   <span className="text-xs font-extrabold text-gray-900">
-                    ${(item.product.price * item.quantity).toFixed(2)}
+                    {formatCurrency(item.product.price * item.quantity)}
                   </span>
                 </div>
               ))}
@@ -368,21 +369,21 @@ export default function CheckoutPage() {
             <div className="space-y-2 text-xs border-t border-gray-100 pt-4 text-gray-600">
               <div className="flex justify-between">
                 <span>Subtotal</span>
-                <span className="font-semibold text-gray-900">${subtotal.toFixed(2)}</span>
+                <span className="font-semibold text-gray-900">{formatCurrency(subtotal)}</span>
               </div>
               {discount > 0 && (
                 <div className="flex justify-between text-emerald-600 font-semibold">
                   <span>Discount ({cartStore.couponCode})</span>
-                  <span>-${discount.toFixed(2)}</span>
+                  <span>-{formatCurrency(discount)}</span>
                 </div>
               )}
               <div className="flex justify-between">
                 <span>Shipping</span>
-                <span className="font-semibold text-gray-900">{shipping === 0 ? "FREE" : `$${shipping.toFixed(2)}`}</span>
+                <span className="font-semibold text-gray-900">{shipping === 0 ? "FREE" : formatCurrency(shipping)}</span>
               </div>
               <div className="flex justify-between text-base font-extrabold text-gray-900 border-t border-gray-100 pt-3">
                 <span>Total Due</span>
-                <span>${total.toFixed(2)}</span>
+                <span>{formatCurrency(total)}</span>
               </div>
             </div>
           </div>
