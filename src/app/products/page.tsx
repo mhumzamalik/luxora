@@ -39,7 +39,7 @@ function ProductsContent() {
   const isBestSeller = searchParams.get("isBestSeller") === "true";
   const isNewArrival = searchParams.get("isNewArrival") === "true";
 
-  const [maxPrice, setMaxPrice] = useState<number>(500);
+  const [maxPrice, setMaxPrice] = useState<number>(100000);
 
   const queryKey = [
     "products",
@@ -103,8 +103,8 @@ function ProductsContent() {
             {searchParam
               ? `Search results for "${searchParam}"`
               : categoryParam !== "all"
-              ? `${categoryParam.toUpperCase()} Collection`
-              : "Luxury Catalog Collection"}
+                ? `${categoryParam.toUpperCase()} Collection`
+                : "Luxury Catalog Collection"}
           </h1>
           <p className="text-xs text-gray-500">
             Explore world-class craftsmanship and signature designer pieces.
@@ -153,16 +153,15 @@ function ProductsContent() {
             <div className="space-y-2 pt-4 border-t border-gray-100">
               <div className="flex justify-between text-xs font-bold text-gray-800">
                 <span>Max Price:</span>
-                <span className="text-indigo-600">${maxPrice}</span>
+                <span className="text-indigo-600">RS {maxPrice}</span>
               </div>
               <input
                 type="range"
-                min="50"
-                max="2000"
-                step="25"
+                min="100"
+                max="100000"
+                step="100"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(Number(e.target.value))}
-                className="w-full accent-black cursor-pointer"
               />
             </div>
           </aside>
