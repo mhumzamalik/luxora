@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { generateVerificationToken } from "@/lib/tokens";
+import { sendVerificationEmail } from "@/lib/resend";
 
 const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -53,6 +55,7 @@ export async function POST(req: Request) {
         email: normalizedEmail,
         passwordHash,
         role: "CUSTOMER",
+        emailVerified: null,
       },
       select: {
         id: true,
@@ -63,8 +66,18 @@ export async function POST(req: Request) {
       },
     });
 
+    // Generate secure verification token & send email
+    const { rawToken } = await generateVerificationToken(normalizedEmail);
+    await sendVerificationEmail({
+      to: normalizedEmail,
+      token: rawToken,
+    });
+
     return NextResponse.json(
-      { message: "Account created successfully", user },
+      {
+        message: "Account created successfully. Please verify your email before logging in.",
+        user,
+      },
       { status: 201 }
     );
   } catch (error) {

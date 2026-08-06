@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { User, Mail, Lock, ArrowRight } from "lucide-react";
@@ -52,20 +51,8 @@ export default function SignupPage() {
         }),
       });
 
-      toastSuccess("Account Created!", "Signing you in automatically...");
-
-      const res = await signIn("credentials", {
-        redirect: false,
-        email: data.email,
-        password: data.password,
-      });
-
-      if (res?.error) {
-        router.push("/auth/login");
-      } else {
-        router.push("/account");
-        router.refresh();
-      }
+      toastSuccess("Account Created!", "Please check your email to verify your account.");
+      router.push(`/auth/check-email?email=${encodeURIComponent(data.email)}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to create account";
       toastError("Registration Failed", msg);

@@ -93,9 +93,11 @@ model Session {
 }
 
 model VerificationToken {
+  id         String   @id @default(cuid())
   identifier String
   token      String   @unique
   expires    DateTime
+  createdAt  DateTime @default(now()) @map("created_at")
 
   @@unique([identifier, token])
   @@map("verification_tokens")
