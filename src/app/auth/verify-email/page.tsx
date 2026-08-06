@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, Suspense } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
@@ -9,6 +9,38 @@ import { CheckCircle2, AlertTriangle, Loader2, ArrowRight, Mail, RefreshCw } fro
 import { useToast } from "@/components/ui/ToastProvider";
 import { fetchApi } from "@/lib/api-client";
 
+interface VerificationResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+  isExpired?: boolean;
+}
+
+const verificationCache = new Map<string, Promise<VerificationResult>>();
+
+function executeVerification(token: string, email: string): Promise<VerificationResult> {
+  const key = `${token}:${email}`;
+  if (!verificationCache.has(key)) {
+    const promise = fetchApi<{ message: string }>(
+      `/api/auth/verify-email?token=${token}&email=${encodeURIComponent(email)}`
+    )
+      .then((res) => ({
+        success: true,
+        message: res.message || "Email verified successfully.",
+      }))
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : "Verification failed";
+        return {
+          success: false,
+          error: msg,
+          isExpired: msg.toLowerCase().includes("expired"),
+        };
+      });
+    verificationCache.set(key, promise);
+  }
+  return verificationCache.get(key)!;
+}
+
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -16,51 +48,41 @@ function VerifyEmailContent() {
   const emailParam = searchParams.get("email") || "";
   const { error: toastError, success: toastSuccess } = useToast();
 
-  const [status, setStatus] = useState<"loading" | "success" | "expired" | "error">("loading");
-  const [errorMessage, setErrorMessage] = useState("");
+  const isParamsInvalid = !token || !emailParam;
+  const [status, setStatus] = useState<"loading" | "success" | "expired" | "error">(
+    isParamsInvalid ? "error" : "loading"
+  );
+  const [errorMessage, setErrorMessage] = useState(
+    isParamsInvalid ? "Invalid or missing verification parameters." : ""
+  );
   const [resendEmail, setResendEmail] = useState(emailParam);
   const [isResending, setIsResending] = useState(false);
-  const hasRequestedRef = useRef(false);
 
   useEffect(() => {
-    if (hasRequestedRef.current) return;
-    hasRequestedRef.current = true;
+    let isSubscribed = true;
 
-    let isMounted = true;
+    if (!token || !emailParam) {
+      return;
+    }
 
-    async function verify() {
-      if (!token || !emailParam) {
-        if (isMounted) {
-          setStatus("error");
-          setErrorMessage("Invalid or missing verification parameters.");
-        }
-        return;
-      }
+    executeVerification(token, emailParam).then((result) => {
+      if (!isSubscribed) return;
 
-      try {
-        await fetchApi<{ message: string }>(
-          `/api/auth/verify-email?token=${token}&email=${encodeURIComponent(emailParam)}`
-        );
-        if (isMounted) {
-          setStatus("success");
-          toastSuccess("Verified!", "Email verified successfully.");
-        }
-      } catch (err: unknown) {
-        if (!isMounted) return;
-        const msg = err instanceof Error ? err.message : "Verification failed";
-        if (msg.toLowerCase().includes("expired")) {
+      if (result.success) {
+        setStatus("success");
+        toastSuccess("Verified!", result.message || "Email verified successfully.");
+      } else {
+        if (result.isExpired) {
           setStatus("expired");
         } else {
           setStatus("error");
         }
-        setErrorMessage(msg);
+        setErrorMessage(result.error || "Verification failed.");
       }
-    }
-
-    verify();
+    });
 
     return () => {
-      isMounted = false;
+      isSubscribed = false;
     };
   }, [token, emailParam, toastSuccess]);
 
