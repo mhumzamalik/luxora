@@ -14,19 +14,22 @@ import {
   StarOff,
   AlertCircle,
   ImageIcon,
+  Link2,
+  Plus,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 import { fetchApi } from "@/lib/api-client";
 
 /* ─────────────────────────────────────────────
    Types
 ───────────────────────────────────────────── */
-interface UploadedImage {
-  /** Unique local key — not sent to server */
+interface ProductImageItem {
   key: string;
   url: string;
   isPrimary: boolean;
-  /** Display name from the original file */
   name: string;
+  source: "upload" | "url";
 }
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -39,7 +42,7 @@ const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 async function uploadFile(file: File): Promise<string> {
   const fd = new FormData();
   fd.append("file", file);
-  fd.append("bucket", "uploads"); // existing Supabase bucket
+  fd.append("bucket", "uploads");
 
   const res = await fetch("/api/upload", { method: "POST", body: fd });
   if (!res.ok) {
@@ -52,47 +55,103 @@ async function uploadFile(file: File): Promise<string> {
 }
 
 /* ─────────────────────────────────────────────
-   Image thumbnail card
+   URL Validator helper
+───────────────────────────────────────────── */
+function validateImageUrl(
+  urlStr: string,
+  existingUrls: string[]
+): { valid: boolean; error?: string } {
+  if (!urlStr || !urlStr.trim()) {
+    return { valid: false, error: "Please enter an image URL." };
+  }
+  const trimmed = urlStr.trim();
+  if (
+    trimmed.startsWith("javascript:") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("file:")
+  ) {
+    return {
+      valid: false,
+      error: "Invalid URL protocol. Only HTTP and HTTPS URLs are allowed.",
+    };
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return { valid: false, error: "Malformed URL. Please enter a valid URL." };
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return { valid: false, error: "Only HTTP and HTTPS URLs are allowed." };
+  }
+  if (existingUrls.includes(trimmed)) {
+    return { valid: false, error: "This image URL has already been added." };
+  }
+  return { valid: true };
+}
+
+/* ─────────────────────────────────────────────
+   Image thumbnail card component
 ───────────────────────────────────────────── */
 function ImageThumb({
   img,
   onRemove,
   onSetPrimary,
 }: {
-  img: UploadedImage;
+  img: ProductImageItem;
   onRemove: (key: string) => void;
   onSetPrimary: (key: string) => void;
 }) {
+  const [loadError, setLoadError] = useState(false);
+
   return (
     <div
-      className={`relative group rounded-2xl overflow-hidden border-2 transition-all duration-200 aspect-square bg-gray-50 ${
+      className={`relative group rounded-2xl overflow-hidden border-2 transition-all duration-200 aspect-square bg-gray-50 flex flex-col justify-between ${
         img.isPrimary
-          ? "border-purple-500 shadow-md shadow-purple-100"
+          ? "border-purple-600 shadow-md shadow-purple-100"
           : "border-gray-200 hover:border-gray-300"
       }`}
     >
-      <Image
-        src={img.url}
-        alt={img.name}
-        fill
-        sizes="160px"
-        className="object-contain p-2"
-      />
-
-      {/* Primary badge */}
+      {/* Primary Badge */}
       {img.isPrimary && (
-        <span className="absolute top-1.5 left-1.5 bg-purple-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow z-10">
+        <span className="absolute top-2 left-2 bg-purple-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow z-10">
           <Star size={9} className="fill-white" /> Primary
         </span>
       )}
 
-      {/* Hover controls */}
-      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 z-20">
+      {/* Source Tag Badge */}
+      <span className="absolute top-2 right-2 bg-black/60 backdrop-blur-xs text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md z-10">
+        {img.source === "upload" ? "Uploaded" : "Unsplash"}
+      </span>
+
+      {/* Image Preview / Error Fallback */}
+      <div className="relative w-full h-full flex items-center justify-center p-2">
+        {loadError ? (
+          <div className="flex flex-col items-center justify-center text-center p-2 text-rose-600 space-y-1">
+            <AlertTriangle size={20} />
+            <span className="text-[9px] font-bold leading-tight">
+              Unable to load this image. Please check the URL.
+            </span>
+          </div>
+        ) : (
+          <Image
+            src={img.url}
+            alt={img.name}
+            fill
+            sizes="180px"
+            className="object-contain p-2"
+            onError={() => setLoadError(true)}
+          />
+        )}
+      </div>
+
+      {/* Hover Controls Overlay */}
+      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 z-20 p-2">
         {!img.isPrimary && (
           <button
             type="button"
             onClick={() => onSetPrimary(img.key)}
-            className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-full transition shadow cursor-pointer"
+            className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-full transition shadow cursor-pointer w-full justify-center"
           >
             <StarOff size={11} /> Set Primary
           </button>
@@ -100,7 +159,7 @@ function ImageThumb({
         <button
           type="button"
           onClick={() => onRemove(img.key)}
-          className="flex items-center gap-1 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-full transition shadow cursor-pointer"
+          className="flex items-center gap-1 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-full transition shadow cursor-pointer w-full justify-center"
         >
           <X size={11} /> Remove
         </button>
@@ -115,7 +174,7 @@ function ImageThumb({
 export default function AddProductPage() {
   const router = useRouter();
 
-  /* — form fields — */
+  /* — Form Fields — */
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [price, setPrice] = useState("");
@@ -123,19 +182,24 @@ export default function AddProductPage() {
   const [description, setDescription] = useState("");
   const [stock, setStock] = useState("50");
 
-  /* — image state — */
-  const [images, setImages] = useState<UploadedImage[]>([]);
+  /* — Image State — */
+  const [images, setImages] = useState<ProductImageItem[]>([]);
   const [uploadingCount, setUploadingCount] = useState(0);
   const [uploadError, setUploadError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [activeTab, setActiveTab] = useState<"device" | "url">("device");
 
-  /* — save state — */
+  /* — URL Input State — */
+  const [urlInput, setUrlInput] = useState("");
+  const [urlError, setUrlError] = useState("");
+
+  /* — Save State — */
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /* ── Process selected files ── */
+  /* ── Process uploaded files ── */
   const processFiles = useCallback(async (files: FileList | File[]) => {
     const fileArr = Array.from(files);
     setUploadError("");
@@ -161,7 +225,7 @@ export default function AddProductPage() {
 
     setUploadingCount((c) => c - toUpload.length);
 
-    const newImages: UploadedImage[] = [];
+    const newImages: ProductImageItem[] = [];
     const errors: string[] = [];
 
     results.forEach((result, idx) => {
@@ -171,6 +235,7 @@ export default function AddProductPage() {
           url: result.value,
           name: toUpload[idx].name,
           isPrimary: false,
+          source: "upload",
         });
       } else {
         errors.push(`"${toUpload[idx].name}": ${result.reason?.message || "Upload failed"}`);
@@ -184,7 +249,6 @@ export default function AddProductPage() {
     if (newImages.length > 0) {
       setImages((prev) => {
         const combined = [...prev, ...newImages];
-        // Auto-set first image as primary if none is set
         const hasPrimary = combined.some((img) => img.isPrimary);
         if (!hasPrimary && combined.length > 0) {
           combined[0] = { ...combined[0], isPrimary: true };
@@ -194,7 +258,7 @@ export default function AddProductPage() {
     }
   }, []);
 
-  /* ── Drag/drop handlers ── */
+  /* ── Drag & Drop ── */
   const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const onDragLeave = () => setIsDragging(false);
   const onDrop = (e: React.DragEvent) => {
@@ -203,11 +267,46 @@ export default function AddProductPage() {
     if (e.dataTransfer.files.length) processFiles(e.dataTransfer.files);
   };
 
-  /* ── Control handlers ── */
+  /* ── Add Image URL ── */
+  const handleAddUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    setUrlError("");
+
+    const existingUrls = images.map((img) => img.url);
+    const { valid, error } = validateImageUrl(urlInput, existingUrls);
+
+    if (!valid && error) {
+      setUrlError(error);
+      return;
+    }
+
+    const trimmedUrl = urlInput.trim();
+    const isUnsplash = trimmedUrl.includes("unsplash.com");
+
+    const newImg: ProductImageItem = {
+      key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      url: trimmedUrl,
+      name: isUnsplash ? "Unsplash Image" : "External Image",
+      isPrimary: false,
+      source: "url",
+    };
+
+    setImages((prev) => {
+      const combined = [...prev, newImg];
+      const hasPrimary = combined.some((img) => img.isPrimary);
+      if (!hasPrimary && combined.length > 0) {
+        combined[0] = { ...combined[0], isPrimary: true };
+      }
+      return combined;
+    });
+
+    setUrlInput("");
+  };
+
+  /* ── Remove Image ── */
   const handleRemove = (key: string) => {
     setImages((prev) => {
       const filtered = prev.filter((img) => img.key !== key);
-      // If we removed the primary, promote the first remaining
       const stillHasPrimary = filtered.some((img) => img.isPrimary);
       if (!stillHasPrimary && filtered.length > 0) {
         filtered[0] = { ...filtered[0], isPrimary: true };
@@ -216,13 +315,14 @@ export default function AddProductPage() {
     });
   };
 
+  /* ── Set Primary ── */
   const handleSetPrimary = (key: string) => {
     setImages((prev) =>
       prev.map((img) => ({ ...img, isPrimary: img.key === key }))
     );
   };
 
-  /* ── Submit ── */
+  /* ── Submit Form ── */
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (uploadingCount > 0) {
@@ -243,7 +343,6 @@ export default function AddProductPage() {
           categorySlug: category,
           description,
           stock,
-          // Send the images array; fallback handled server-side
           images: images.map((img) => ({ url: img.url, isPrimary: img.isPrimary })),
         }),
       });
@@ -366,99 +465,179 @@ export default function AddProductPage() {
           </div>
         </div>
 
-        {/* ── Product Images Card ── */}
-        <div className="bg-white border border-gray-200/70 p-6 md:p-8 rounded-3xl space-y-5 text-xs shadow-2xs">
+        {/* ── Product Images Card (Dual Source: Upload & Unsplash URL) ── */}
+        <div className="bg-white border border-gray-200/70 p-6 md:p-8 rounded-3xl space-y-6 text-xs shadow-2xs">
           <div className="flex items-center justify-between border-b border-gray-100 pb-3">
             <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
               <ImageIcon size={16} className="text-purple-600" />
               Product Images
             </h2>
             <span className="text-[10px] text-gray-400 font-semibold">
-              JPG · PNG · WEBP · max {MAX_SIZE_MB} MB each
+              Support Device Uploads &amp; Unsplash URLs
             </span>
           </div>
 
-          {/* Upload error */}
-          {uploadError && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-[11px] font-semibold flex items-center gap-2">
-              <AlertCircle size={14} className="shrink-0" />
-              {uploadError}
+          {/* Source Tabs Header */}
+          <div className="flex border-b border-gray-200 gap-6">
+            <button
+              type="button"
+              onClick={() => setActiveTab("device")}
+              className={`pb-2.5 font-bold transition flex items-center gap-2 cursor-pointer border-b-2 -mb-px text-xs ${
+                activeTab === "device"
+                  ? "border-purple-600 text-purple-600"
+                  : "border-transparent text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              <UploadCloud size={15} />
+              Upload from device
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("url")}
+              className={`pb-2.5 font-bold transition flex items-center gap-2 cursor-pointer border-b-2 -mb-px text-xs ${
+                activeTab === "url"
+                  ? "border-purple-600 text-purple-600"
+                  : "border-transparent text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              <Link2 size={15} />
+              Use image URL (Unsplash)
+            </button>
+          </div>
+
+          {/* Source 1: Upload from device */}
+          {activeTab === "device" && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              {uploadError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-[11px] font-semibold flex items-center gap-2">
+                  <AlertCircle size={14} className="shrink-0" />
+                  {uploadError}
+                </div>
+              )}
+
+              <div
+                onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
+                onDrop={onDrop}
+                onClick={() => !isUploading && fileInputRef.current?.click()}
+                className={`
+                  relative flex flex-col items-center justify-center gap-3
+                  border-2 border-dashed rounded-2xl p-8 cursor-pointer
+                  transition-all duration-200 select-none
+                  ${
+                    isDragging
+                      ? "border-purple-400 bg-purple-50"
+                      : "border-gray-200 bg-gray-50/60 hover:border-purple-300 hover:bg-purple-50/30"
+                  }
+                  ${isUploading ? "pointer-events-none opacity-70" : ""}
+                `}
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 size={28} className="animate-spin text-purple-500" />
+                    <p className="text-[11px] font-semibold text-gray-500">
+                      Uploading {uploadingCount} image{uploadingCount > 1 ? "s" : ""}…
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center">
+                      <UploadCloud size={22} className="text-purple-500" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-bold text-gray-700">
+                        Drag &amp; drop images here, or{" "}
+                        <span className="text-purple-600 underline underline-offset-2 cursor-pointer">
+                          browse
+                        </span>
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        Supports JPG, PNG, WEBP · Up to {MAX_SIZE_MB} MB per image
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fileInputRef.current?.click();
+                      }}
+                      className="inline-flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold px-4 py-2 rounded-full transition shadow cursor-pointer"
+                    >
+                      <UploadCloud size={13} /> Upload Images
+                    </button>
+                  </>
+                )}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files?.length) {
+                      processFiles(e.target.files);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+              </div>
             </div>
           )}
 
-          {/* Drag-and-drop zone */}
-          <div
-            onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
-            onDrop={onDrop}
-            onClick={() => !isUploading && fileInputRef.current?.click()}
-            className={`
-              relative flex flex-col items-center justify-center gap-3
-              border-2 border-dashed rounded-2xl p-8 cursor-pointer
-              transition-all duration-200 select-none
-              ${isDragging
-                ? "border-purple-400 bg-purple-50"
-                : "border-gray-200 bg-gray-50/60 hover:border-purple-300 hover:bg-purple-50/30"
-              }
-              ${isUploading ? "pointer-events-none opacity-70" : ""}
-            `}
-          >
-            {isUploading ? (
-              <>
-                <Loader2 size={28} className="animate-spin text-purple-500" />
-                <p className="text-[11px] font-semibold text-gray-500">
-                  Uploading {uploadingCount} image{uploadingCount > 1 ? "s" : ""}…
+          {/* Source 2: Use image URL */}
+          {activeTab === "url" && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="space-y-2">
+                <label className="font-bold text-gray-800 block">
+                  Image URL (Unsplash or direct image link)
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="url"
+                      value={urlInput}
+                      onChange={(e) => {
+                        setUrlInput(e.target.value);
+                        setUrlError("");
+                      }}
+                      placeholder="https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800"
+                      className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 font-mono outline-hidden focus:border-purple-600 text-xs"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddUrl}
+                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-5 py-3 rounded-xl transition shadow flex items-center gap-1.5 shrink-0 cursor-pointer text-xs"
+                  >
+                    <Plus size={15} /> Add Image URL
+                  </button>
+                </div>
+                {urlError && (
+                  <p className="text-rose-600 text-[11px] font-semibold flex items-center gap-1 mt-1">
+                    <AlertCircle size={13} /> {urlError}
+                  </p>
+                )}
+                <p className="text-[10px] text-gray-400">
+                  Example: https://images.unsplash.com/photo-1505740420928-5e560c06d30e
                 </p>
-              </>
-            ) : (
-              <>
-                <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center">
-                  <UploadCloud size={22} className="text-purple-500" />
-                </div>
-                <div className="text-center">
-                  <p className="text-xs font-bold text-gray-700">
-                    Drag &amp; drop images here, or{" "}
-                    <span className="text-purple-600 underline underline-offset-2 cursor-pointer">
-                      browse
-                    </span>
-                  </p>
-                  <p className="text-[10px] text-gray-400 mt-1">
-                    Supports JPG, PNG, WEBP · Up to {MAX_SIZE_MB} MB per image
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
-                  className="inline-flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold px-4 py-2 rounded-full transition shadow cursor-pointer"
-                >
-                  <UploadCloud size={13} /> Upload Images
-                </button>
-              </>
-            )}
+              </div>
+            </div>
+          )}
 
-            {/* Hidden file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/jpg,image/png,image/webp"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files?.length) {
-                  processFiles(e.target.files);
-                  e.target.value = ""; // reset so same file can be re-selected
-                }
-              }}
-            />
-          </div>
-
-          {/* Image thumbnails grid */}
+          {/* ── Unified Image Gallery (Mixed Uploads & Unsplash URLs) ── */}
           {images.length > 0 && (
-            <div className="space-y-3">
-              <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
-                {images.length} image{images.length !== 1 ? "s" : ""} · Hover to set primary or remove
-              </p>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+            <div className="space-y-3 pt-2 border-t border-gray-100">
+              <div className="flex justify-between items-center">
+                <p className="text-[11px] text-gray-700 font-bold uppercase tracking-wider">
+                  Image Gallery ({images.length})
+                </p>
+                <span className="text-[10px] text-gray-400 font-semibold">
+                  Hover image to set primary or remove
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {images.map((img) => (
                   <ImageThumb
                     key={img.key}
@@ -469,22 +648,22 @@ export default function AddProductPage() {
                 ))}
               </div>
 
-              {/* Primary image indicator */}
-              <div className="flex items-center gap-2 text-[10px] text-gray-500 bg-purple-50 border border-purple-100 rounded-xl p-3">
-                <Star size={12} className="fill-purple-500 text-purple-500 shrink-0" />
+              {/* Primary Image Notice */}
+              <div className="flex items-center gap-2 text-[10px] text-gray-600 bg-purple-50 border border-purple-100 rounded-xl p-3">
+                <CheckCircle2 size={14} className="text-purple-600 shrink-0" />
                 <span>
-                  <strong className="text-purple-700">
-                    {images.find((img) => img.isPrimary)?.name || "First image"}
-                  </strong>{" "}
-                  is set as the primary image and will be shown on product cards and listings.
+                  Primary image is set to:{" "}
+                  <strong className="text-purple-700 font-bold">
+                    {images.find((img) => img.isPrimary)?.name || "First item"}
+                  </strong>
                 </span>
               </div>
             </div>
           )}
 
           {images.length === 0 && !isUploading && (
-            <p className="text-[10px] text-gray-400 text-center">
-              No images uploaded yet. Products without images will use a fallback placeholder.
+            <p className="text-[10px] text-gray-400 text-center py-2">
+              No images added yet. Add images by uploading from device or pasting an Unsplash URL above.
             </p>
           )}
         </div>

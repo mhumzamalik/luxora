@@ -76,10 +76,28 @@ export async function POST(req: Request) {
     type ImageInput = { url: string; isPrimary?: boolean };
     let imageCreatePayload: ImageInput[] | undefined;
 
+    const isValidImageUrl = (urlStr: string): boolean => {
+      if (!urlStr || typeof urlStr !== "string") return false;
+      const trimmed = urlStr.trim();
+      if (
+        trimmed.startsWith("javascript:") ||
+        trimmed.startsWith("data:") ||
+        trimmed.startsWith("file:")
+      ) {
+        return false;
+      }
+      try {
+        const parsed = new URL(trimmed);
+        return parsed.protocol === "http:" || parsed.protocol === "https:";
+      } catch {
+        return false;
+      }
+    };
+
     if (Array.isArray(images) && images.length > 0) {
-      // Validate each entry has a non-empty URL string
+      // Validate each entry has a valid HTTP/HTTPS URL
       const valid = (images as ImageInput[]).filter(
-        (img) => img && typeof img.url === "string" && img.url.trim().length > 0
+        (img) => img && isValidImageUrl(img.url)
       );
       if (valid.length > 0) {
         // Ensure exactly one primary; if none marked, make first primary
@@ -89,7 +107,7 @@ export async function POST(req: Request) {
           isPrimary: hasPrimary ? Boolean(img.isPrimary) : idx === 0,
         }));
       }
-    } else if (imageUrl && typeof imageUrl === "string" && imageUrl.trim().length > 0) {
+    } else if (isValidImageUrl(imageUrl)) {
       imageCreatePayload = [{ url: imageUrl.trim(), isPrimary: true }];
     }
 
