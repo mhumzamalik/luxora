@@ -13,6 +13,10 @@ import {
   User,
   MapPin,
   Loader2,
+  ImageIcon,
+  ExternalLink,
+  X,
+  ShieldAlert,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api-client";
@@ -38,7 +42,8 @@ interface OrderDetail {
   bankReference: string | null;
   paymentStatus: string;
   status: string;
-  proofImageUrl: string | null;
+  /** Correct field name matching the Prisma/DB response */
+  paymentProofUrl: string | null;
   shippingAddress: string | ShippingAddress | null;
   user: { name: string | null; email: string };
   items: Array<{
@@ -52,6 +57,170 @@ interface OrderDetail {
   }>;
 }
 
+/* ─── Proof image helpers ─────────────────────────────── */
+function isPdf(url: string) {
+  return url.toLowerCase().includes(".pdf") || url.toLowerCase().includes("application/pdf");
+}
+
+/* ─── Full-image lightbox modal ──────────────────────── */
+function ProofLightbox({ url, onClose }: { url: string; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="relative max-w-3xl w-full max-h-[90vh] bg-white rounded-3xl overflow-hidden shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+          <span className="text-xs font-bold text-gray-700">Payment Proof — Full View</span>
+          <div className="flex items-center gap-2">
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-600 hover:text-purple-800 transition"
+            >
+              <ExternalLink size={13} /> Open in new tab
+            </a>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-full hover:bg-gray-100 text-gray-500 transition cursor-pointer"
+              aria-label="Close"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+        {/* Image */}
+        <div className="relative w-full" style={{ minHeight: "400px" }}>
+          <Image
+            src={url}
+            alt="Payment Proof — Full Size"
+            fill
+            className="object-contain p-4"
+            sizes="(max-width: 768px) 100vw, 760px"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Payment Proof section ──────────────────────────── */
+function PaymentProofSection({ paymentProofUrl, paymentMethod }: {
+  paymentProofUrl: string | null;
+  paymentMethod: string;
+}) {
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  const isBankTransfer = paymentMethod === "BANK_TRANSFER";
+
+  /* Only render for Bank Transfer or if a proof URL exists on any method */
+  if (!isBankTransfer && !paymentProofUrl) return null;
+
+  return (
+    <>
+      {lightboxOpen && paymentProofUrl && !isPdf(paymentProofUrl) && (
+        <ProofLightbox url={paymentProofUrl} onClose={() => setLightboxOpen(false)} />
+      )}
+
+      <div className="bg-white border border-gray-200/70 p-6 rounded-3xl space-y-4 shadow-2xs">
+        {/* Section header */}
+        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+          <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+            <ImageIcon size={16} className="text-purple-600" />
+            Payment Proof
+          </h3>
+          {paymentProofUrl && (
+            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              SUBMITTED
+            </span>
+          )}
+          {!paymentProofUrl && isBankTransfer && (
+            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+              <ShieldAlert size={11} /> AWAITING PROOF
+            </span>
+          )}
+        </div>
+
+        {paymentProofUrl ? (
+          <div className="space-y-3">
+            {isPdf(paymentProofUrl) ? (
+              /* PDF: download / view link */
+              <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl p-4">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center shrink-0">
+                  <FileCheck size={20} className="text-rose-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-gray-900 truncate">Payment Proof (PDF)</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5 truncate">{paymentProofUrl}</p>
+                </div>
+                <a
+                  href={paymentProofUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 inline-flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold px-4 py-2 rounded-xl transition"
+                >
+                  <ExternalLink size={12} />
+                  View / Download
+                </a>
+              </div>
+            ) : (
+              /* Image preview */
+              <div className="space-y-2">
+                <p className="text-[10px] text-gray-400 font-semibold">
+                  Click the image or button below to view full size.
+                </p>
+                <button
+                  onClick={() => setLightboxOpen(true)}
+                  className="relative w-full h-60 bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 cursor-zoom-in group"
+                >
+                  <Image
+                    src={paymentProofUrl}
+                    alt="Payment Proof"
+                    fill
+                    sizes="(max-width: 768px) 100vw, 600px"
+                    className="object-contain p-3 group-hover:opacity-90 transition"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition flex items-center justify-center">
+                    <span className="opacity-0 group-hover:opacity-100 transition bg-white/90 text-gray-900 text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 shadow">
+                      <ExternalLink size={12} /> View Full Image
+                    </span>
+                  </div>
+                </button>
+                <a
+                  href={paymentProofUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-purple-600 hover:text-purple-800 transition mt-1"
+                >
+                  <ExternalLink size={12} />
+                  Open original in new tab
+                </a>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Empty state */
+          <div className="flex flex-col items-center justify-center gap-2 py-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+            <ImageIcon size={28} className="text-gray-300" />
+            <p className="text-xs font-bold text-gray-400">No payment proof uploaded</p>
+            {isBankTransfer && (
+              <p className="text-[10px] text-gray-400 max-w-xs">
+                Bank Transfer orders require a payment proof. The customer has not submitted one yet.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+/* ─── Main page ─────────────────────────────────────── */
 export default function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const queryClient = useQueryClient();
@@ -120,7 +289,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl text-xs font-semibold flex items-center gap-3 animate-in fade-in">
           <CheckCircle2 size={20} className="text-emerald-600 flex-shrink-0" />
           <div>
-            <p className="font-bold">Bank Transfer Verified & Order Marked as PAID!</p>
+            <p className="font-bold">Bank Transfer Verified &amp; Order Marked as PAID!</p>
             <p className="text-[11px] text-emerald-700 mt-0.5">
               Inventory stock decremented automatically. Confirmation email sent to {order.user?.email}.
             </p>
@@ -129,9 +298,9 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Verification Action & Proof Image */}
+        {/* Left Column */}
         <div className="lg:col-span-7 space-y-6">
-          {/* Payment Status Card */}
+          {/* Payment Status / Bank Transfer Card */}
           <div className="bg-white border border-gray-200/70 p-6 rounded-3xl space-y-4 shadow-2xs">
             <div className="flex justify-between items-center border-b border-gray-100 pb-4">
               <div className="flex items-center space-x-2">
@@ -142,7 +311,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               </div>
               {order.paymentStatus === "PAID" ? (
                 <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
-                  <CheckCircle2 size={14} /> VERIFIED & PAID
+                  <CheckCircle2 size={14} /> VERIFIED &amp; PAID
                 </span>
               ) : (
                 <span className="bg-amber-50 text-amber-700 text-xs font-bold px-3 py-1 rounded-full border border-amber-200 flex items-center gap-1">
@@ -166,23 +335,6 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               </div>
             </div>
 
-            {/* Uploaded Payment Proof Image Preview */}
-            {order.proofImageUrl && (
-              <div className="space-y-2">
-                <span className="text-xs font-bold text-gray-700 block">
-                  Uploaded Payment Receipt / Proof:
-                </span>
-                <div className="relative w-full h-64 bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 flex items-center justify-center p-2">
-                  <Image
-                    src={order.proofImageUrl}
-                    alt="Proof of Payment"
-                    fill
-                    className="object-contain rounded-xl"
-                  />
-                </div>
-              </div>
-            )}
-
             {/* Action Trigger Button */}
             {order.paymentStatus !== "PAID" && (
               <button
@@ -199,6 +351,12 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               </button>
             )}
           </div>
+
+          {/* ── Payment Proof Section ── */}
+          <PaymentProofSection
+            paymentProofUrl={order.paymentProofUrl}
+            paymentMethod={order.paymentMethod}
+          />
 
           {/* Ordered Items Table */}
           <div className="bg-white border border-gray-200/70 p-6 rounded-3xl space-y-4 shadow-2xs">
