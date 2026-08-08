@@ -18,11 +18,21 @@ export interface CartItem {
   quantity: number;
 }
 
+export interface AppliedCoupon {
+  code: string;
+  discountType: "PERCENTAGE" | "FIXED";
+  discountValue: number;
+  maxDiscount?: number | null;
+  minOrderAmount?: number | null;
+}
+
 interface CartStore {
   items: CartItem[];
   isOpen: boolean;
-  couponCode: string | null;
-  discountPercentage: number;
+  coupon: AppliedCoupon | null;
+  couponCode: string | null; // legacy backward compatibility
+  discountPercentage: number; // legacy backward compatibility
+
   openCart: () => void;
   closeCart: () => void;
   toggleCart: () => void;
@@ -30,7 +40,7 @@ interface CartStore {
   removeItem: (productId: string, variantId?: string) => void;
   updateQuantity: (productId: string, quantity: number, variantId?: string) => void;
   clearCart: () => void;
-  applyCoupon: (code: string, discountPercentage: number) => void;
+  applyCoupon: (coupon: AppliedCoupon | { code: string; discountType?: string; discountValue: number }) => void;
   removeCoupon: () => void;
   getSubtotal: () => number;
   getDiscountAmount: () => number;
@@ -44,6 +54,7 @@ export const useCartStore = create<CartStore>()(
     (set, get) => ({
       items: [],
       isOpen: false,
+      coupon: null,
       couponCode: null,
       discountPercentage: 0,
 
@@ -90,12 +101,36 @@ export const useCartStore = create<CartStore>()(
         }));
       },
 
-      clearCart: () => set({ items: [], couponCode: null, discountPercentage: 0 }),
+      clearCart: () =>
+        set({
+          items: [],
+          coupon: null,
+          couponCode: null,
+          discountPercentage: 0,
+        }),
 
-      applyCoupon: (code, discountPercentage) =>
-        set({ couponCode: code, discountPercentage }),
+      applyCoupon: (couponData) => {
+        const fullCoupon: AppliedCoupon = {
+          code: couponData.code.toUpperCase().trim(),
+          discountType: (couponData.discountType === "FIXED" ? "FIXED" : "PERCENTAGE") as "PERCENTAGE" | "FIXED",
+          discountValue: couponData.discountValue,
+          maxDiscount: "maxDiscount" in couponData ? couponData.maxDiscount : null,
+          minOrderAmount: "minOrderAmount" in couponData ? couponData.minOrderAmount : null,
+        };
 
-      removeCoupon: () => set({ couponCode: null, discountPercentage: 0 }),
+        set({
+          coupon: fullCoupon,
+          couponCode: fullCoupon.code,
+          discountPercentage: fullCoupon.discountType === "PERCENTAGE" ? fullCoupon.discountValue : 0,
+        });
+      },
+
+      removeCoupon: () =>
+        set({
+          coupon: null,
+          couponCode: null,
+          discountPercentage: 0,
+        }),
 
       getSubtotal: () => {
         return get().items.reduce((total, item) => total + item.product.price * item.quantity, 0);
@@ -103,13 +138,30 @@ export const useCartStore = create<CartStore>()(
 
       getDiscountAmount: () => {
         const subtotal = get().getSubtotal();
-        return (subtotal * get().discountPercentage) / 100;
+        const coupon = get().coupon;
+        if (!coupon || subtotal <= 0) return 0;
+
+        if (coupon.minOrderAmount && subtotal < coupon.minOrderAmount) {
+          return 0; // Minimum order not met
+        }
+
+        let discount = 0;
+        if (coupon.discountType === "PERCENTAGE") {
+          discount = (subtotal * coupon.discountValue) / 100;
+          if (coupon.maxDiscount && discount > coupon.maxDiscount) {
+            discount = coupon.maxDiscount;
+          }
+        } else {
+          discount = Math.min(subtotal, coupon.discountValue);
+        }
+
+        return Math.max(0, discount);
       },
 
       getShippingFee: () => {
         const subtotal = get().getSubtotal();
         if (subtotal === 0) return 0;
-        return subtotal >= 150 ? 0 : 15; // Free shipping over $150
+        return subtotal >= 150 ? 0 : 15;
       },
 
       getTotal: () => {

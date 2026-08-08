@@ -5,7 +5,7 @@ import { formatCurrency } from "@/lib/currency";
 
 const validateCouponSchema = z.object({
   code: z.string().min(1, "Coupon code is required"),
-  orderAmount: z.number().min(0),
+  orderAmount: z.number().min(0, "Order amount must be positive"),
 });
 
 export async function POST(req: Request) {
@@ -21,36 +21,44 @@ export async function POST(req: Request) {
     }
 
     const { code, orderAmount } = parsed.data;
+    const normalizedCode = code.toUpperCase().trim();
 
     const coupon = await prisma.coupon.findUnique({
-      where: { code: code.toUpperCase().trim() },
+      where: { code: normalizedCode },
     });
 
-    if (!coupon || !coupon.isActive) {
+    if (!coupon) {
       return NextResponse.json(
-        { error: "Invalid or inactive coupon code" },
+        { error: "Coupon not found." },
+        { status: 404 }
+      );
+    }
+
+    if (!coupon.isActive) {
+      return NextResponse.json(
+        { error: "This coupon is currently inactive." },
         { status: 400 }
       );
     }
 
-    if (coupon.expiresAt && coupon.expiresAt < new Date()) {
+    if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
       return NextResponse.json(
-        { error: "Coupon code has expired" },
+        { error: "This coupon code has expired." },
         { status: 400 }
       );
     }
 
-    if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
+    if (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit) {
       return NextResponse.json(
-        { error: "Coupon usage limit reached" },
+        { error: "This coupon has reached its usage limit." },
         { status: 400 }
       );
     }
 
-    if (coupon.minOrderAmount && orderAmount < coupon.minOrderAmount) {
+    if (coupon.minOrderAmount !== null && orderAmount < coupon.minOrderAmount) {
       return NextResponse.json(
         {
-          error: `Minimum order amount of ${formatCurrency(coupon.minOrderAmount)} required for this coupon`,
+          error: `Minimum order amount of ${formatCurrency(coupon.minOrderAmount)} required for this coupon.`,
         },
         { status: 400 }
       );
@@ -59,7 +67,7 @@ export async function POST(req: Request) {
     let discountAmount = 0;
     if (coupon.discountType === "PERCENTAGE") {
       discountAmount = (orderAmount * coupon.discountValue) / 100;
-      if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
+      if (coupon.maxDiscount !== null && discountAmount > coupon.maxDiscount) {
         discountAmount = coupon.maxDiscount;
       }
     } else {
@@ -72,7 +80,9 @@ export async function POST(req: Request) {
         code: coupon.code,
         discountType: coupon.discountType,
         discountValue: coupon.discountValue,
-        discountAmount,
+        maxDiscount: coupon.maxDiscount,
+        minOrderAmount: coupon.minOrderAmount,
+        discountAmount: Math.max(0, discountAmount),
       },
     });
   } catch (error) {

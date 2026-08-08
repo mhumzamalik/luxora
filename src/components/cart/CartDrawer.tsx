@@ -11,6 +11,7 @@ export function CartDrawer() {
   const cartStore = useCartStore();
   const [couponInput, setCouponInput] = useState("");
   const [couponError, setCouponError] = useState("");
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
   if (!cartStore.isOpen) return null;
 
@@ -19,15 +20,35 @@ export function CartDrawer() {
   const amountToFreeShipping = Math.max(0, freeShippingThreshold - subtotal);
   const progressPercent = Math.min(100, (subtotal / freeShippingThreshold) * 100);
 
-  const handleApplyCoupon = (e: React.FormEvent) => {
+  const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     setCouponError("");
+    if (!couponInput.trim()) return;
 
-    if (couponInput.trim().toUpperCase() === "LUXORA20") {
-      cartStore.applyCoupon("LUXORA20", 20);
-      setCouponInput("");
-    } else {
-      setCouponError("Invalid promo code. Try LUXORA20");
+    setIsValidatingCoupon(true);
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: couponInput.trim(), orderAmount: subtotal }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        setCouponError(data.error || "Invalid promo code.");
+      } else {
+        cartStore.applyCoupon({
+          code: data.coupon.code,
+          discountType: data.coupon.discountType,
+          discountValue: data.coupon.discountValue,
+          maxDiscount: data.coupon.maxDiscount,
+          minOrderAmount: data.coupon.minOrderAmount,
+        });
+        setCouponInput("");
+      }
+    } catch {
+      setCouponError("Failed to validate coupon code.");
+    } finally {
+      setIsValidatingCoupon(false);
     }
   };
 

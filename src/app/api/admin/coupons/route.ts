@@ -28,16 +28,46 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { code, discountType, discountValue, minOrderAmount, usageLimit, expiresAt } = body;
+    const {
+      code,
+      discountType,
+      discountValue,
+      minOrderAmount,
+      maxDiscount,
+      usageLimit,
+      expiresAt,
+      isActive,
+    } = body;
+
+    if (!code || !code.trim()) {
+      return NextResponse.json({ error: "Coupon code is required" }, { status: 400 });
+    }
+
+    if (discountValue === undefined || discountValue === null || isNaN(parseFloat(discountValue))) {
+      return NextResponse.json({ error: "Valid discount value is required" }, { status: 400 });
+    }
+
+    const normalizedCode = code.toUpperCase().trim();
+
+    // Check if code already exists
+    const existing = await prisma.coupon.findUnique({
+      where: { code: normalizedCode },
+    });
+
+    if (existing) {
+      return NextResponse.json({ error: "Coupon code already exists" }, { status: 400 });
+    }
 
     const coupon = await prisma.coupon.create({
       data: {
-        code: code.toUpperCase().trim(),
-        discountType: discountType || "PERCENTAGE",
+        code: normalizedCode,
+        discountType: discountType === "FIXED" ? "FIXED" : "PERCENTAGE",
         discountValue: parseFloat(discountValue),
         minOrderAmount: minOrderAmount ? parseFloat(minOrderAmount) : null,
+        maxDiscount: maxDiscount ? parseFloat(maxDiscount) : null,
         usageLimit: usageLimit ? parseInt(usageLimit, 10) : null,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
+        isActive: typeof isActive === "boolean" ? isActive : true,
       },
     });
 

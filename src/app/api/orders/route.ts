@@ -175,27 +175,46 @@ export async function POST(req: Request) {
     let validCouponCode: string | null = null;
 
     if (couponCode) {
+      const normalizedCode = couponCode.toUpperCase().trim();
       const coupon = await prisma.coupon.findUnique({
-        where: { code: couponCode.toUpperCase().trim() },
+        where: { code: normalizedCode },
       });
 
-      if (
-        coupon &&
-        coupon.isActive &&
-        (!coupon.expiresAt || coupon.expiresAt > new Date()) &&
-        (!coupon.minOrderAmount || subtotal >= coupon.minOrderAmount)
-      ) {
-        if (coupon.discountType === "PERCENTAGE") {
-          discountAmount = (subtotal * coupon.discountValue) / 100;
-          if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
-            discountAmount = coupon.maxDiscount;
-          }
-        } else {
-          discountAmount = Math.min(subtotal, coupon.discountValue);
-        }
-        validCouponId = coupon.id;
-        validCouponCode = coupon.code;
+      if (!coupon) {
+        return NextResponse.json({ error: "Coupon not found." }, { status: 400 });
       }
+
+      if (!coupon.isActive) {
+        return NextResponse.json({ error: "This coupon is currently inactive." }, { status: 400 });
+      }
+
+      if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
+        return NextResponse.json({ error: "This coupon code has expired." }, { status: 400 });
+      }
+
+      if (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit) {
+        return NextResponse.json({ error: "This coupon has reached its usage limit." }, { status: 400 });
+      }
+
+      if (coupon.minOrderAmount !== null && subtotal < coupon.minOrderAmount) {
+        return NextResponse.json(
+          { error: `Minimum order amount of Rs. ${coupon.minOrderAmount} required for this coupon.` },
+          { status: 400 }
+        );
+      }
+
+      if (coupon.discountType === "PERCENTAGE") {
+        discountAmount = (subtotal * coupon.discountValue) / 100;
+        if (coupon.maxDiscount !== null && discountAmount > coupon.maxDiscount) {
+          discountAmount = coupon.maxDiscount;
+        }
+      } else {
+        discountAmount = Math.min(subtotal, coupon.discountValue);
+      }
+
+      discountAmount = Math.max(0, discountAmount);
+      validCouponId = coupon.id;
+      validCouponCode = coupon.code;
     }
 
     const shippingFee = subtotal >= 150 ? 0 : 15;
