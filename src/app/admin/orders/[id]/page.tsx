@@ -19,12 +19,14 @@ import { fetchApi } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/currency";
 
 interface ShippingAddress {
-  addressLine1?: string;
+  id?: string;
+  fullName?: string;
   street?: string;
   city?: string;
   state?: string;
   postalCode?: string;
   country?: string;
+  phone?: string;
 }
 
 interface OrderDetail {
@@ -96,7 +98,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
     typeof order.shippingAddress === "string"
       ? order.shippingAddress
       : order.shippingAddress
-      ? `${order.shippingAddress.addressLine1 || order.shippingAddress.street || ""}, ${order.shippingAddress.city || ""}, ${order.shippingAddress.postalCode || ""}`
+      ? `${order.shippingAddress.street || ""}, ${order.shippingAddress.city || ""}, ${order.shippingAddress.postalCode || ""}`
       : "No address provided";
 
   return (
@@ -245,7 +247,44 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
             <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
               <MapPin size={16} className="text-purple-600" /> Shipping Address
             </h3>
-            <p className="text-gray-700 leading-relaxed">{shippingAddr}</p>
+            {typeof order.shippingAddress === "object" && order.shippingAddress ? (
+              <div className="space-y-2 text-gray-700">
+                {order.shippingAddress.fullName && (
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">Recipient Name</span>
+                    <span className="font-bold text-gray-900">{order.shippingAddress.fullName}</span>
+                  </div>
+                )}
+                <div>
+                  <span className="text-gray-400 block text-[10px]">Street Address</span>
+                  <span className="font-semibold text-gray-800">{order.shippingAddress.street || "N/A"}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">City / State</span>
+                    <span>
+                      {[order.shippingAddress.city, order.shippingAddress.state].filter(Boolean).join(", ")}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">Postal Code</span>
+                    <span className="font-mono">{order.shippingAddress.postalCode || "N/A"}</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">Country</span>
+                    <span>{order.shippingAddress.country || "N/A"}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">Phone</span>
+                    <span className="font-mono">{order.shippingAddress.phone || "N/A"}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-gray-700 leading-relaxed">{shippingAddr}</p>
+            )}
           </div>
         </div>
       </div>

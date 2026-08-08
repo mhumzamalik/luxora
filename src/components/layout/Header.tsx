@@ -73,7 +73,7 @@ export function Header() {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center space-x-4">
             <span className="font-medium text-gray-800">
-              Free shipping on orders over $150
+              Free shipping on orders over <b>5000</b>
             </span>
             <span className="hidden md:inline text-gray-300">•</span>
             <span className="hidden md:inline">30-day easy returns</span>

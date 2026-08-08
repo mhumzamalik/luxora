@@ -23,6 +23,7 @@ export interface ProductCardProps {
     rating: number;
     reviewCount: number;
     category?: string | { name: string; slug: string } | null;
+    variants?: Array<{ id: string; stock: number }>;
     image?: string;
     images?: Array<{ url: string; alt?: string; isPrimary?: boolean }>;
     colors?: Array<{ name: string; hex: string }>;
@@ -33,7 +34,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const cartStore = useCartStore();
   const wishlistStore = useWishlistStore();
   const quickViewStore = useQuickViewStore();
-  const { success: toastSuccess } = useToast();
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const primaryImage =
     product.images?.find((img) => img.isPrimary)?.url ||
@@ -43,6 +44,12 @@ export function ProductCard({ product }: ProductCardProps) {
 
   const isWishlisted = wishlistStore.isInWishlist(product.id);
 
+  const defaultVariant = product.variants?.[0];
+  const totalStock = product.variants
+    ? product.variants.reduce((sum, v) => sum + v.stock, 0)
+    : undefined;
+  const isOutOfStock = totalStock !== undefined && totalStock <= 0;
+
   const cartProduct: CartProduct = {
     id: product.id,
     name: product.name,
@@ -50,6 +57,7 @@ export function ProductCard({ product }: ProductCardProps) {
     price: product.price,
     comparePrice: product.comparePrice,
     image: primaryImage,
+    variantId: defaultVariant?.id,
   };
 
   const handleQuickView = (e: React.MouseEvent) => {
@@ -84,6 +92,10 @@ export function ProductCard({ product }: ProductCardProps) {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isOutOfStock) {
+      toastError("Out of Stock", `${product.name} is currently out of stock.`);
+      return;
+    }
     cartStore.addItem(cartProduct, 1);
     toastSuccess("Added to Bag", `${product.name} has been added to your shopping bag.`);
   };
@@ -94,7 +106,7 @@ export function ProductCard({ product }: ProductCardProps) {
         {/* Image & Badges Wrapper */}
         <div className="relative w-full aspect-square rounded-xl bg-[#F8F8F8] overflow-hidden mb-4 flex items-center justify-center">
           {/* Discount/Status Badge */}
-          {product.badge && (
+          {product.badge ? (
             <span
               className={`absolute top-3 left-3 z-10 text-[11px] font-extrabold px-2.5 py-1 rounded-full shadow-2xs ${
                 product.badge.startsWith("-")
@@ -106,7 +118,11 @@ export function ProductCard({ product }: ProductCardProps) {
             >
               {product.badge}
             </span>
-          )}
+          ) : isOutOfStock ? (
+            <span className="absolute top-3 left-3 z-10 text-[10px] font-bold px-2.5 py-1 rounded-full bg-rose-500 text-white shadow-2xs">
+              Out of Stock
+            </span>
+          ) : null}
 
           {/* Wishlist Button */}
           <button
@@ -199,16 +215,18 @@ export function ProductCard({ product }: ProductCardProps) {
       <div className="flex items-center space-x-2 pt-4 mt-2">
         <button
           onClick={handleAddToCart}
-          className="p-2.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+          disabled={isOutOfStock}
+          className="p-2.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-100 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           aria-label="Add to cart icon"
         >
           <ShoppingBag size={16} />
         </button>
         <button
           onClick={handleAddToCart}
-          className="flex-1 bg-black hover:bg-gray-800 text-white text-xs font-semibold py-2.5 rounded-xl transition shadow-xs cursor-pointer"
+          disabled={isOutOfStock}
+          className="flex-1 bg-black hover:bg-gray-800 text-white text-xs font-semibold py-2.5 rounded-xl transition shadow-xs disabled:bg-gray-300 disabled:cursor-not-allowed cursor-pointer"
         >
-          Add to Cart
+          {isOutOfStock ? "Out of Stock" : "Add to Cart"}
         </button>
       </div>
     </div>

@@ -28,14 +28,14 @@ export function Footer() {
 
             <div className="flex items-center space-x-4 text-gray-400 pt-2">
               <a href="#" className="hover:text-white transition" aria-label="Share">
-              <Share2 size={18} />
-            </a>
-            <a href="#" className="hover:text-white transition" aria-label="Follow">
-              <Camera size={18} />
-            </a>
-            <a href="#" className="hover:text-white transition" aria-label="Message">
-              <Send size={18} />
-            </a>
+                <Share2 size={18} />
+              </a>
+              <a href="#" className="hover:text-white transition" aria-label="Follow">
+                <Camera size={18} />
+              </a>
+              <a href="#" className="hover:text-white transition" aria-label="Message">
+                <Send size={18} />
+              </a>
             </div>
           </div>
 
@@ -88,18 +88,15 @@ export function Footer() {
           <p>© {new Date().getFullYear()} LUXORA. All rights reserved.</p>
 
           <div className="flex items-center space-x-3 text-[11px] font-bold text-gray-400">
-            <span className="px-2 py-1 bg-white/10 rounded-sm">VISA</span>
-            <span className="px-2 py-1 bg-white/10 rounded-sm">MASTERCARD</span>
-            <span className="px-2 py-1 bg-white/10 rounded-sm">AMEX</span>
-            <span className="px-2 py-1 bg-white/10 rounded-sm">PAYPAL</span>
-            <span className="px-2 py-1 bg-white/10 rounded-sm">APPLE PAY</span>
             <span className="px-2 py-1 bg-white/10 rounded-sm">BANK TRANSFER</span>
+            <span className="px-2 py-1 bg-white/10 rounded-sm">MASTERCARD</span>
+            <span className="px-2 py-1 bg-white/10 rounded-sm">VISA</span>
           </div>
 
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-1 border border-gray-800 rounded-full px-3 py-1 text-xs">
               <Globe size={13} />
-              <span>United States</span>
+              <span>PAKISTAN</span>
             </div>
 
             <button

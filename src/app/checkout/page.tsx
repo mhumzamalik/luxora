@@ -7,11 +7,21 @@ import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { useCartStore } from "@/store/cart-store";
-import { Landmark, Lock, Upload, CheckCircle2 } from "lucide-react";
+import {
+  Landmark,
+  Lock,
+  Upload,
+  CheckCircle2,
+  Truck,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
 import { useSession } from "next-auth/react";
 import { fetchApi } from "@/lib/api-client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { formatCurrency } from "@/lib/currency";
+
+type PaymentMethodType = "BANK_TRANSFER" | "COD";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -26,25 +36,47 @@ export default function CheckoutPage() {
     city: "",
     state: "",
     postalCode: "",
-    country: "United States",
+    country: "Pakistan",
     phone: "",
     notes: "",
   });
 
+  const [selectedPaymentMethod, setSelectedPaymentMethod] =
+    useState<PaymentMethodType>("BANK_TRANSFER");
   const [paymentProofUrl, setPaymentProofUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [proofError, setProofError] = useState(false);
 
   const subtotal = cartStore.getSubtotal();
   const discount = cartStore.getDiscountAmount();
   const shipping = cartStore.getShippingFee();
   const total = cartStore.getTotal();
 
+  // The Place Order button should be disabled when:
+  // - Submitting is in progress
+  // - Proof is still uploading
+  // - Bank Transfer is selected but no proof has been uploaded yet
+  const isBankTransferMissingProof =
+    selectedPaymentMethod === "BANK_TRANSFER" && !paymentProofUrl;
+  const isPlaceOrderDisabled = isSubmitting || isUploading || isBankTransferMissingProof;
+
+  const handlePaymentMethodChange = (method: PaymentMethodType) => {
+    setSelectedPaymentMethod(method);
+    // Clear proof error when switching away from BANK_TRANSFER
+    if (method === "COD") {
+      setProofError(false);
+    }
+  };
+
   const handleProofUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Reset proof error on new upload attempt
+    setProofError(false);
     setIsUploading(true);
+
     try {
       const data = new FormData();
       data.append("file", file);
@@ -61,9 +93,11 @@ export default function CheckoutPage() {
         toastSuccess("File Uploaded", "Payment proof uploaded successfully.");
       } else {
         toastError("Upload Failed", json.error || "Could not upload file.");
+        setPaymentProofUrl(null);
       }
     } catch {
-      toastError("Upload Error", "Failed to upload payment proof.");
+      toastError("Upload Error", "Failed to upload payment proof. Please try again.");
+      setPaymentProofUrl(null);
     } finally {
       setIsUploading(false);
     }
@@ -74,6 +108,16 @@ export default function CheckoutPage() {
 
     if (cartStore.items.length === 0) {
       toastError("Empty Bag", "Your shopping bag is empty.");
+      return;
+    }
+
+    // Frontend guard: Block BANK_TRANSFER without proof
+    if (selectedPaymentMethod === "BANK_TRANSFER" && !paymentProofUrl) {
+      setProofError(true);
+      toastError(
+        "Payment Proof Required",
+        "Please upload your payment receipt before placing the order."
+      );
       return;
     }
 
@@ -96,20 +140,25 @@ export default function CheckoutPage() {
           country: formData.country,
           phone: formData.phone,
         },
-        paymentMethod: "BANK_TRANSFER",
-        paymentProofUrl: paymentProofUrl || undefined,
+        paymentMethod: selectedPaymentMethod,
+        // Only include proof URL for BANK_TRANSFER
+        paymentProofUrl:
+          selectedPaymentMethod === "BANK_TRANSFER" && paymentProofUrl
+            ? paymentProofUrl
+            : undefined,
         couponCode: cartStore.couponCode || undefined,
         guestEmail: session?.user ? undefined : formData.email,
         notes: formData.notes || undefined,
       };
 
-      const order = await fetchApi<{ id: string; orderNumber: string; bankReference: string }>(
-        "/api/orders",
-        {
-          method: "POST",
-          body: JSON.stringify(orderPayload),
-        }
-      );
+      const order = await fetchApi<{
+        id: string;
+        orderNumber: string;
+        bankReference: string;
+      }>("/api/orders", {
+        method: "POST",
+        body: JSON.stringify(orderPayload),
+      });
 
       cartStore.clearCart();
       toastSuccess("Order Placed!", `Order #${order.orderNumber} confirmed.`);
@@ -129,8 +178,13 @@ export default function CheckoutPage() {
         <main className="flex-1 flex items-center justify-center p-8">
           <div className="bg-white p-10 rounded-3xl border border-gray-100 text-center space-y-4 max-w-md shadow-sm">
             <h2 className="text-xl font-bold text-gray-900">Your Shopping Bag is Empty</h2>
-            <p className="text-xs text-gray-500">Add items to your shopping bag before proceeding to checkout.</p>
-            <Link href="/products" className="inline-block bg-black text-white text-xs font-bold px-6 py-3 rounded-xl">
+            <p className="text-xs text-gray-500">
+              Add items to your shopping bag before proceeding to checkout.
+            </p>
+            <Link
+              href="/products"
+              className="inline-block bg-black text-white text-xs font-bold px-6 py-3 rounded-xl"
+            >
               Explore Products
             </Link>
           </div>
@@ -146,7 +200,8 @@ export default function CheckoutPage() {
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-8 py-8">
         <div className="text-xs text-gray-400 mb-6">
-          <Link href="/cart">Bag</Link> / <span className="text-gray-800 font-semibold">Checkout</span>
+          <Link href="/cart">Bag</Link> /{" "}
+          <span className="text-gray-800 font-semibold">Checkout</span>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -190,7 +245,7 @@ export default function CheckoutPage() {
                     required
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="+1 (555) 000-0000"
+                    placeholder="+92 300 123456"
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-hidden focus:border-black transition"
                   />
                 </div>
@@ -202,7 +257,7 @@ export default function CheckoutPage() {
                     required
                     value={formData.street}
                     onChange={(e) => setFormData({ ...formData, street: e.target.value })}
-                    placeholder="742 Evergreen Terrace"
+                    placeholder="Enter Address"
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-hidden focus:border-black transition"
                   />
                 </div>
@@ -214,19 +269,19 @@ export default function CheckoutPage() {
                     required
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    placeholder="New York"
+                    placeholder="Enter City"
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-hidden focus:border-black transition"
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-gray-700 block mb-1">State / Province</label>
+                  <label className="font-bold text-gray-700 block mb-1">Province</label>
                   <input
                     type="text"
                     required
                     value={formData.state}
                     onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                    placeholder="NY"
+                    placeholder="Enter Province"
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-hidden focus:border-black transition"
                   />
                 </div>
@@ -256,84 +311,192 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Step 2: Payment Method (Bank Transfer) */}
+            {/* Step 2: Payment Method */}
             <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-2xs space-y-4">
               <h2 className="text-lg font-serif font-bold text-gray-900">
                 2. Payment Method
               </h2>
 
-              <div className="p-4 rounded-2xl border-2 border-indigo-600 bg-indigo-50/50 flex items-start space-x-3">
-                <div className="p-2 bg-indigo-600 text-white rounded-xl">
-                  <Landmark size={20} />
-                </div>
-                <div className="flex-1">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-xs font-bold text-gray-900">Direct Bank Transfer</h4>
-                    <span className="text-[10px] font-extrabold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">
-                      Primary
-                    </span>
+              {/* Payment Method Selector Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Option A: Bank Transfer */}
+                <button
+                  type="button"
+                  onClick={() => handlePaymentMethodChange("BANK_TRANSFER")}
+                  className={`flex items-start gap-3 p-4 rounded-2xl border-2 text-left transition cursor-pointer ${
+                    selectedPaymentMethod === "BANK_TRANSFER"
+                      ? "border-indigo-600 bg-indigo-50/50"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <div
+                    className={`p-2 rounded-xl mt-0.5 shrink-0 ${
+                      selectedPaymentMethod === "BANK_TRANSFER"
+                        ? "bg-indigo-600 text-white"
+                        : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    <Landmark size={18} />
                   </div>
-                  <p className="text-[11px] text-gray-600 mt-1">
-                    Transfer payment directly to our store bank account. Inventory is reserved while payment verification takes place.
+                  <div>
+                    <p className="text-xs font-bold text-gray-900">Direct Bank Transfer</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
+                      Transfer to our bank account and upload payment proof.
+                    </p>
+                  </div>
+                  {selectedPaymentMethod === "BANK_TRANSFER" && (
+                    <CheckCircle2
+                      size={16}
+                      className="ml-auto text-indigo-600 shrink-0 mt-0.5"
+                    />
+                  )}
+                </button>
+
+                {/* Option B: Cash on Delivery */}
+                <button
+                  type="button"
+                  onClick={() => handlePaymentMethodChange("COD")}
+                  className={`flex items-start gap-3 p-4 rounded-2xl border-2 text-left transition cursor-pointer ${
+                    selectedPaymentMethod === "COD"
+                      ? "border-emerald-600 bg-emerald-50/50"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <div
+                    className={`p-2 rounded-xl mt-0.5 shrink-0 ${
+                      selectedPaymentMethod === "COD"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    <Truck size={18} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-900">Cash on Delivery</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
+                      Pay in cash when your order arrives at your door.
+                    </p>
+                  </div>
+                  {selectedPaymentMethod === "COD" && (
+                    <CheckCircle2
+                      size={16}
+                      className="ml-auto text-emerald-600 shrink-0 mt-0.5"
+                    />
+                  )}
+                </button>
+              </div>
+
+              {/* Bank Transfer Details — only shown for BANK_TRANSFER */}
+              {selectedPaymentMethod === "BANK_TRANSFER" && (
+                <>
+                  {/* Bank Instructions Card */}
+                  <div className="bg-gray-900 text-white p-5 rounded-2xl space-y-3 text-xs">
+                    <div className="grid grid-cols-2 gap-2 text-gray-300">
+                      <div>
+                        <span className="text-gray-500 block text-[10px]">Bank Name</span>
+                        <span className="font-semibold">Luxora National Bank</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block text-[10px]">Account Name</span>
+                        <span className="font-semibold">LUXORA RETAIL GROUP INC</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block text-[10px]">Account Number</span>
+                        <span className="font-mono font-semibold">1092-8837-4412-9901</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block text-[10px]">SWIFT / BIC</span>
+                        <span className="font-mono font-semibold">LUXUS33XXX</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Proof Upload — REQUIRED for BANK_TRANSFER */}
+                  <div className="pt-1 space-y-2 text-xs">
+                    <label className="font-bold text-gray-700 flex items-center gap-1.5">
+                      Upload Payment Receipt / Proof
+                      <span className="text-rose-600 font-extrabold">*</span>
+                      <span className="text-[10px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-full">
+                        Required
+                      </span>
+                    </label>
+
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <label
+                        className={`flex items-center gap-2 font-bold px-4 py-2.5 rounded-xl cursor-pointer transition text-xs ${
+                          isUploading
+                            ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                            : "bg-gray-100 hover:bg-gray-200 text-gray-800"
+                        }`}
+                      >
+                        {isUploading ? (
+                          <Loader2 size={15} className="animate-spin" />
+                        ) : (
+                          <Upload size={15} />
+                        )}
+                        <span>{isUploading ? "Uploading..." : "Choose File"}</span>
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={handleProofUpload}
+                          disabled={isUploading}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {paymentProofUrl && !isUploading && (
+                        <span className="text-emerald-600 font-bold flex items-center gap-1 text-xs">
+                          <CheckCircle2 size={15} />
+                          Receipt Attached
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Validation error message */}
+                    {proofError && !paymentProofUrl && (
+                      <p className="flex items-center gap-1.5 text-rose-600 font-semibold text-[11px] mt-1">
+                        <AlertCircle size={13} />
+                        Payment proof is required for bank transfer.
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* COD confirmation note */}
+              {selectedPaymentMethod === "COD" && (
+                <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-xs text-emerald-800">
+                  <Truck size={16} className="shrink-0 mt-0.5 text-emerald-600" />
+                  <p>
+                    <span className="font-bold">Cash on Delivery selected.</span> No payment is
+                    required now. Our delivery agent will collect payment when your order
+                    arrives. No upload needed.
                   </p>
                 </div>
-              </div>
-
-              {/* Bank Instructions Card */}
-              <div className="bg-gray-900 text-white p-5 rounded-2xl space-y-3 text-xs">
-                <div className="grid grid-cols-2 gap-2 text-gray-300">
-                  <div>
-                    <span className="text-gray-500 block text-[10px]">Bank Name</span>
-                    <span className="font-semibold">Luxora National Bank</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 block text-[10px]">Account Name</span>
-                    <span className="font-semibold">LUXORA RETAIL GROUP INC</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 block text-[10px]">Account Number</span>
-                    <span className="font-mono font-semibold">1092-8837-4412-9901</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 block text-[10px]">SWIFT / BIC</span>
-                    <span className="font-mono font-semibold">LUXUS33XXX</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Optional Payment Proof Uploader */}
-              <div className="pt-2 space-y-2 text-xs">
-                <label className="font-bold text-gray-700 block">
-                  Upload Payment Receipt / Proof (Optional)
-                </label>
-                <div className="flex items-center space-x-3">
-                  <label className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold px-4 py-2.5 rounded-xl cursor-pointer transition">
-                    <Upload size={16} />
-                    <span>{isUploading ? "Uploading..." : "Choose File"}</span>
-                    <input
-                      type="file"
-                      accept="image/*,.pdf"
-                      onChange={handleProofUpload}
-                      disabled={isUploading}
-                      className="hidden"
-                    />
-                  </label>
-                  {paymentProofUrl && (
-                    <span className="text-emerald-600 font-bold flex items-center gap-1">
-                      <CheckCircle2 size={16} /> Receipt Attached
-                    </span>
-                  )}
-                </div>
-              </div>
+              )}
             </div>
 
+            {/* Place Order Button */}
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-black hover:bg-gray-800 text-white text-sm font-bold py-4 rounded-2xl shadow-xl transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+              disabled={isPlaceOrderDisabled}
+              title={
+                isBankTransferMissingProof
+                  ? "Upload payment proof to place order"
+                  : undefined
+              }
+              className="w-full bg-black hover:bg-gray-800 text-white text-sm font-bold py-4 rounded-2xl shadow-xl transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {isSubmitting ? (
-                <span>Placing Order...</span>
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Placing Order...</span>
+                </>
+              ) : isBankTransferMissingProof ? (
+                <>
+                  <Upload size={16} />
+                  <span>Upload Payment Proof to Continue</span>
+                </>
               ) : (
                 <>
                   <Lock size={16} />
@@ -353,7 +516,12 @@ export default function CheckoutPage() {
               {cartStore.items.map((item, idx) => (
                 <div key={idx} className="pt-3 first:pt-0 flex items-center space-x-3">
                   <div className="relative w-14 h-14 bg-gray-50 rounded-xl overflow-hidden shrink-0 border border-gray-100">
-                    <Image src={item.product.image} alt={item.product.name} fill className="object-contain p-1" />
+                    <Image
+                      src={item.product.image}
+                      alt={item.product.name}
+                      fill
+                      className="object-contain p-1"
+                    />
                   </div>
                   <div className="flex-1 text-xs">
                     <h4 className="font-bold text-gray-900 truncate">{item.product.name}</h4>
@@ -379,8 +547,25 @@ export default function CheckoutPage() {
               )}
               <div className="flex justify-between">
                 <span>Shipping</span>
-                <span className="font-semibold text-gray-900">{shipping === 0 ? "FREE" : formatCurrency(shipping)}</span>
+                <span className="font-semibold text-gray-900">
+                  {shipping === 0 ? "FREE" : formatCurrency(shipping)}
+                </span>
               </div>
+
+              {/* Payment method indicator in summary */}
+              <div className="flex justify-between pt-1">
+                <span>Payment</span>
+                <span
+                  className={`font-bold text-xs px-2 py-0.5 rounded-full ${
+                    selectedPaymentMethod === "COD"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-indigo-50 text-indigo-700"
+                  }`}
+                >
+                  {selectedPaymentMethod === "COD" ? "Cash on Delivery" : "Bank Transfer"}
+                </span>
+              </div>
+
               <div className="flex justify-between text-base font-extrabold text-gray-900 border-t border-gray-100 pt-3">
                 <span>Total Due</span>
                 <span>{formatCurrency(total)}</span>

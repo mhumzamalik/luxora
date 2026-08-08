@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma, PaymentMethod } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
 import { resend } from "@/lib/resend";
@@ -23,15 +23,29 @@ const addressSchema = z.object({
   phone: z.string().min(5),
 });
 
-const createOrderSchema = z.object({
-  items: z.array(orderItemSchema).min(1, "Cart cannot be empty"),
-  shippingAddress: addressSchema,
-  paymentMethod: z.enum(["BANK_TRANSFER", "CREDIT_CARD", "PAYPAL"]),
-  paymentProofUrl: z.string().optional(),
-  couponCode: z.string().optional(),
-  guestEmail: z.string().email().optional(),
-  notes: z.string().optional(),
-});
+const createOrderSchema = z
+  .object({
+    items: z.array(orderItemSchema).min(1, "Cart cannot be empty"),
+    shippingAddress: addressSchema,
+    paymentMethod: z.enum(["BANK_TRANSFER", "CREDIT_CARD", "PAYPAL", "COD"]),
+    paymentProofUrl: z.string().url().optional(),
+    couponCode: z.string().optional(),
+    guestEmail: z.string().email().optional(),
+    notes: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      // Server-side guard: BANK_TRANSFER MUST have a payment proof URL
+      if (data.paymentMethod === "BANK_TRANSFER" && !data.paymentProofUrl) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "Payment proof is required for bank transfer orders.",
+      path: ["paymentProofUrl"],
+    }
+  );
 
 export async function POST(req: Request) {
   try {
@@ -56,7 +70,7 @@ export async function POST(req: Request) {
       notes,
     } = parsed.data;
 
-    const userId = session?.user?.id || null;
+    const userId = session?.user?.id || undefined;
     const email = session?.user?.email || guestEmail;
 
     if (!userId && !guestEmail) {
@@ -66,147 +80,219 @@ export async function POST(req: Request) {
       );
     }
 
-    // Execute order creation transaction
-    const order = await prisma.$transaction(async (tx) => {
-      // 1. Calculate pricing and verify stock
-      let subtotal = 0;
-      const verifiedItems: {
-        productId: string;
-        variantId?: string;
-        quantity: number;
-        unitPrice: number;
-        totalPrice: number;
-      }[] = [];
+    // -------------------------------------------------------------
+    // STAGE 1: PRE-TRANSACTION (READ & VALIDATE OUTSIDE TRANSACTION)
+    // -------------------------------------------------------------
+    const productIds = Array.from(new Set(items.map((i) => i.productId)));
+    const explicitVariantIds = Array.from(
+      new Set(items.map((i) => i.variantId).filter((v): v is string => Boolean(v)))
+    );
 
-      for (const item of items) {
-        const product = await tx.product.findUnique({
-          where: { id: item.productId },
-        });
+    // Batch read products and variants in parallel outside the transaction
+    const [fetchedProducts, fetchedExplicitVariants, defaultVariants] =
+      await Promise.all([
+        prisma.product.findMany({
+          where: { id: { in: productIds } },
+        }),
+        explicitVariantIds.length > 0
+          ? prisma.productVariant.findMany({
+            where: { id: { in: explicitVariantIds } },
+          })
+          : Promise.resolve([]),
+        prisma.productVariant.findMany({
+          where: { productId: { in: productIds } },
+        }),
+      ]);
 
-        if (!product) {
-          throw new Error(`Product ID ${item.productId} not found`);
-        }
+    const productMap = new Map(fetchedProducts.map((p) => [p.id, p]));
+    const variantMap = new Map(fetchedExplicitVariants.map((v) => [v.id, v]));
 
-        let variantStock = 999;
-        if (item.variantId) {
-          const variant = await tx.productVariant.findUnique({
-            where: { id: item.variantId },
-          });
-          if (!variant) throw new Error(`Product variant not found`);
-          variantStock = variant.stock;
-          if (variantStock < item.quantity) {
-            throw new Error(`Insufficient stock for product ${product.name}`);
-          }
-          // Decrement stock
-          await tx.productVariant.update({
-            where: { id: item.variantId },
-            data: { stock: { decrement: item.quantity } },
-          });
-        }
+    let subtotal = 0;
+    const verifiedItems: {
+      productId: string;
+      variantId: string;
+      quantity: number;
+      unitPrice: number;
+      totalPrice: number;
+    }[] = [];
 
-        const lineTotal = product.price * item.quantity;
-        subtotal += lineTotal;
-
-        verifiedItems.push({
-          productId: product.id,
-          variantId: item.variantId,
-          quantity: item.quantity,
-          unitPrice: product.price,
-          totalPrice: lineTotal,
-        });
+    for (const item of items) {
+      const product = productMap.get(item.productId);
+      if (!product) {
+        return NextResponse.json(
+          { error: `Product not found (ID: ${item.productId})` },
+          { status: 400 }
+        );
       }
 
-      // 2. Validate & Calculate Coupon Discount
-      let discountAmount = 0;
-      if (couponCode) {
-        const coupon = await tx.coupon.findUnique({
-          where: { code: couponCode.toUpperCase().trim() },
-        });
+      let variant = item.variantId ? variantMap.get(item.variantId) : undefined;
+      if (!variant) {
+        variant = defaultVariants.find((v) => v.productId === item.productId);
+      }
 
-        if (
-          coupon &&
-          coupon.isActive &&
-          (!coupon.expiresAt || coupon.expiresAt > new Date()) &&
-          (!coupon.minOrderAmount || subtotal >= coupon.minOrderAmount)
-        ) {
-          if (coupon.discountType === "PERCENTAGE") {
-            discountAmount = (subtotal * coupon.discountValue) / 100;
-            if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
-              discountAmount = coupon.maxDiscount;
-            }
-          } else {
-            discountAmount = Math.min(subtotal, coupon.discountValue);
+      if (!variant) {
+        return NextResponse.json(
+          { error: `No available inventory record for product "${product.name}"` },
+          { status: 400 }
+        );
+      }
+
+      if (variant.stock < item.quantity) {
+        return NextResponse.json(
+          {
+            error: `Insufficient stock for "${product.name}". Only ${variant.stock} item(s) available, but ${item.quantity} requested.`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const lineTotal = product.price * item.quantity;
+      subtotal += lineTotal;
+
+      verifiedItems.push({
+        productId: product.id,
+        variantId: variant.id,
+        quantity: item.quantity,
+        unitPrice: product.price,
+        totalPrice: lineTotal,
+      });
+    }
+
+    // Validate Coupon Discount (outside transaction)
+    let discountAmount = 0;
+    let validCouponId: string | null = null;
+    let validCouponCode: string | null = null;
+
+    if (couponCode) {
+      const coupon = await prisma.coupon.findUnique({
+        where: { code: couponCode.toUpperCase().trim() },
+      });
+
+      if (
+        coupon &&
+        coupon.isActive &&
+        (!coupon.expiresAt || coupon.expiresAt > new Date()) &&
+        (!coupon.minOrderAmount || subtotal >= coupon.minOrderAmount)
+      ) {
+        if (coupon.discountType === "PERCENTAGE") {
+          discountAmount = (subtotal * coupon.discountValue) / 100;
+          if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
+            discountAmount = coupon.maxDiscount;
           }
+        } else {
+          discountAmount = Math.min(subtotal, coupon.discountValue);
+        }
+        validCouponId = coupon.id;
+        validCouponCode = coupon.code;
+      }
+    }
 
+    const shippingFee = subtotal >= 150 ? 0 : 15;
+    const total = Math.max(0, subtotal - discountAmount + shippingFee);
+
+    // -------------------------------------------------------------
+    // STAGE 2: FAST TRANSACTION (ATOMIC DECREMENTS & RECORD CREATION)
+    // -------------------------------------------------------------
+    const order = await prisma.$transaction(
+      async (tx) => {
+        // 1. Atomic Stock Decrement with stock >= quantity guard
+        for (const item of verifiedItems) {
+          const updatedCount = await tx.productVariant.updateMany({
+            where: {
+              id: item.variantId,
+              stock: { gte: item.quantity },
+            },
+            data: {
+              stock: { decrement: item.quantity },
+            },
+          });
+
+          if (updatedCount.count === 0) {
+            throw new Error(
+              `Stock changed during checkout for product. Please try placing your order again.`
+            );
+          }
+        }
+
+        // 2. Increment coupon used count if valid
+        if (validCouponId) {
           await tx.coupon.update({
-            where: { id: coupon.id },
+            where: { id: validCouponId },
             data: { usedCount: { increment: 1 } },
           });
         }
-      }
 
-      // 3. Shipping fee calculation (Free over $150)
-      const shippingFee = subtotal >= 150 ? 0 : 15;
-      const total = Math.max(0, subtotal - discountAmount + shippingFee);
-
-      const addressData: Prisma.AddressUncheckedCreateInput = {
-        fullName: shippingAddress.fullName,
-        street: shippingAddress.street,
-        city: shippingAddress.city,
-        state: shippingAddress.state,
-        postalCode: shippingAddress.postalCode,
-        country: shippingAddress.country,
-        phone: shippingAddress.phone || "",
-        userId: userId || "",
-      };
-
-      const address = await tx.address.create({
-        data: addressData,
-      });
-
-      // 5. Generate Order Number & Bank Reference
-      const timestamp = Date.now().toString().slice(-6);
-      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-      const orderNumber = `LX-${new Date().getFullYear()}-${timestamp}`;
-      const bankReference = `REF-${timestamp}${randomSuffix}`;
-
-      const paymentStatus = paymentProofUrl ? "PROOF_SUBMITTED" : "PENDING";
-
-      // 6. Create Order record
-      const createdOrder = await tx.order.create({
-        data: {
-          orderNumber,
-          userId,
-          guestEmail,
-          shippingAddressId: address.id,
-          paymentMethod,
-          paymentStatus,
-          paymentProofUrl,
-          subtotal,
-          discountAmount,
-          shippingFee,
-          total,
-          couponCode,
-          bankReference,
-          notes,
-          items: {
-            create: verifiedItems,
+        // 3. Create Shipping Address
+        const address = await tx.address.create({
+          data: {
+            fullName: shippingAddress.fullName,
+            street: shippingAddress.street,
+            city: shippingAddress.city,
+            state: shippingAddress.state,
+            postalCode: shippingAddress.postalCode,
+            country: shippingAddress.country,
+            phone: shippingAddress.phone || "",
+            userId: userId || undefined,
           },
-        },
-        include: {
-          items: {
-            include: {
-              product: true,
+        });
+
+        // 4. Generate Order Number & Bank Reference
+        const timestamp = Date.now().toString().slice(-6);
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+        const orderNumber = `LX-${new Date().getFullYear()}-${timestamp}`;
+        const bankReference = `REF-${timestamp}${randomSuffix}`;
+
+        let paymentStatus: "PENDING" | "PROOF_SUBMITTED" | "PAID" | "FAILED" | "REFUNDED";
+        if (paymentMethod === "COD") {
+          paymentStatus = "PENDING";
+        } else if (paymentMethod === "BANK_TRANSFER" && paymentProofUrl) {
+          paymentStatus = "PROOF_SUBMITTED";
+        } else {
+          paymentStatus = "PENDING";
+        }
+
+        // 5. Create Order record with OrderItems
+        const createdOrder = await tx.order.create({
+          data: {
+            orderNumber,
+            userId,
+            guestEmail: userId ? undefined : guestEmail,
+            shippingAddressId: address.id,
+            paymentMethod: paymentMethod as PaymentMethod,
+            paymentStatus,
+            paymentProofUrl,
+            subtotal,
+            discountAmount,
+            shippingFee,
+            total,
+            couponCode: validCouponCode || undefined,
+            bankReference,
+            notes,
+            items: {
+              create: verifiedItems,
             },
           },
-          shippingAddress: true,
-        },
-      });
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+            shippingAddress: true,
+          },
+        });
 
-      return createdOrder;
-    });
+        return createdOrder;
+      },
+      {
+        timeout: 15000, // 15 seconds production safety timeout
+        maxWait: 5000,
+      }
+    );
 
-    // Send confirmation email asynchronously via Resend
+    // -------------------------------------------------------------
+    // STAGE 3: ASYNCHRONOUS POST-PROCESSING (EMAIL CONFIRMATION)
+    // -------------------------------------------------------------
     if (email && process.env.RESEND_API_KEY) {
       try {
         await resend?.emails.send({
@@ -224,10 +310,10 @@ export async function POST(req: Request) {
               <h3 style="margin-top: 24px;">Items Ordered:</h3>
               <ul>
                 ${order.items
-                  .map(
-                    (i) => `<li>${i.product.name} x ${i.quantity} - ${formatCurrency(i.totalPrice)}</li>`
-                  )
-                  .join("")}
+              .map(
+                (i) => `<li>${i.product.name} x ${i.quantity} - ${formatCurrency(i.totalPrice)}</li>`
+              )
+              .join("")}
               </ul>
               <p style="margin-top: 24px; color: #666; font-size: 13px;">If you paid via Direct Bank Transfer, please retain reference <strong>${order.bankReference}</strong> for verification.</p>
             </div>

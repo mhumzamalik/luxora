@@ -26,6 +26,16 @@ interface ProductReview {
   user?: { name: string | null } | null;
 }
 
+interface ProductVariantData {
+  id: string;
+  sku: string;
+  stock: number;
+  price?: number | null;
+  size?: string | null;
+  color?: string | null;
+  colorHex?: string | null;
+}
+
 interface ProductDetailData {
   product: {
     id: string;
@@ -37,9 +47,9 @@ interface ProductDetailData {
     badge?: string | null;
     rating: number;
     reviewCount: number;
-    stock: number;
     category?: { name: string; slug: string } | null;
     images: { url: string; isPrimary?: boolean }[];
+    variants?: ProductVariantData[];
     reviews?: ProductReview[];
   };
   relatedProducts: {
@@ -67,7 +77,8 @@ export default function ProductDetailPage({
   const queryClient = useQueryClient();
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [selectedColor] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
 
   // Review Form state
@@ -90,17 +101,62 @@ export default function ProductDetailPage({
   const activeImage = images[activeImageIndex] || images[0];
   const isWishlisted = product ? wishlistStore.isInWishlist(product.id) : false;
 
+  // Determine available variants, color/size options, and active variant stock
+  const variants = product?.variants || [];
+  const availableColors = Array.from(
+    new Set(variants.map((v) => v.color).filter((c): c is string => Boolean(c)))
+  );
+  const availableSizes = Array.from(
+    new Set(variants.map((v) => v.size).filter((s): s is string => Boolean(s)))
+  );
+
+  // Find exact selected variant or default to first variant
+  const selectedVariant = variants.find((v) => {
+    if (selectedColor && v.color !== selectedColor) return false;
+    if (selectedSize && v.size !== selectedSize) return false;
+    return true;
+  }) || variants[0];
+
+  const availableStock = selectedVariant
+    ? selectedVariant.stock
+    : variants.reduce((acc, v) => acc + v.stock, 0);
+
+  const isOutOfStock = availableStock <= 0;
+
   const handleAddToCart = () => {
     if (!product) return;
+    if (isOutOfStock) {
+      toastError("Out of Stock", "This item/variant is currently out of stock.");
+      return;
+    }
+
+    // Check cart item quantity against available stock
+    const existingCartItem = cartStore.items.find(
+      (item) =>
+        item.product.id === product.id &&
+        item.product.variantId === (selectedVariant?.id || undefined)
+    );
+    const existingQty = existingCartItem ? existingCartItem.quantity : 0;
+
+    if (existingQty + quantity > availableStock) {
+      toastError(
+        "Stock Limit Reached",
+        `Only ${availableStock} item(s) available in stock. You already have ${existingQty} in your bag.`
+      );
+      return;
+    }
+
     cartStore.addItem(
       {
         id: product.id,
         name: product.name,
         slug: product.slug,
-        price: product.price,
+        price: selectedVariant?.price || product.price,
         comparePrice: product.comparePrice,
         image: activeImage,
-        selectedColor: selectedColor || undefined,
+        selectedColor: selectedColor || selectedVariant?.color || undefined,
+        selectedSize: selectedSize || selectedVariant?.size || undefined,
+        variantId: selectedVariant?.id,
       },
       quantity
     );
@@ -244,7 +300,9 @@ export default function ProductDetailPage({
 
               {/* Price */}
               <div className="flex items-baseline space-x-3 pt-2">
-                <span className="text-3xl font-extrabold text-gray-900">{formatCurrency(product.price)}</span>
+                <span className="text-3xl font-extrabold text-gray-900">
+                  {formatCurrency(selectedVariant?.price || product.price)}
+                </span>
                 {product.comparePrice && (
                   <span className="text-sm text-gray-400 line-through">{formatCurrency(product.comparePrice)}</span>
                 )}
@@ -255,24 +313,110 @@ export default function ProductDetailPage({
                 )}
               </div>
 
+              {/* Stock Status Badge */}
+              <div className="pt-1">
+                {isOutOfStock ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                    Out of Stock
+                  </span>
+                ) : availableStock <= 10 ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    Only {availableStock} left in stock - order soon
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    In Stock ({availableStock} available)
+                  </span>
+                )}
+              </div>
+
               <p className="text-xs text-gray-600 leading-relaxed pt-2">
                 {product.description}
               </p>
+
+              {/* Color Variant Selector */}
+              {availableColors.length > 0 && (
+                <div className="pt-2 space-y-2">
+                  <label className="text-xs font-bold text-gray-900 block">
+                    Color: <span className="text-gray-600 font-normal">{selectedColor || availableColors[0]}</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableColors.map((color) => {
+                      const isSelected = (selectedColor || availableColors[0]) === color;
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setSelectedColor(color)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                            isSelected
+                              ? "bg-black text-white border-black"
+                              : "bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-400"
+                          }`}
+                        >
+                          {color}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Size Variant Selector */}
+              {availableSizes.length > 0 && (
+                <div className="pt-2 space-y-2">
+                  <label className="text-xs font-bold text-gray-900 block">
+                    Size: <span className="text-gray-600 font-normal">{selectedSize || availableSizes[0]}</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableSizes.map((size) => {
+                      const isSelected = (selectedSize || availableSizes[0]) === size;
+                      return (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => setSelectedSize(size)}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                            isSelected
+                              ? "bg-black text-white border-black"
+                              : "bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-400"
+                          }`}
+                        >
+                          {size}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Quantity Selector */}
               <div className="pt-2 space-y-2">
                 <label className="text-xs font-bold text-gray-900">Quantity</label>
                 <div className="flex items-center space-x-3">
                   <button
+                    type="button"
+                    disabled={isOutOfStock || quantity <= 1}
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="w-9 h-9 rounded-xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-50 flex items-center justify-center cursor-pointer"
+                    className="w-9 h-9 rounded-xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-50 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                   >
                     -
                   </button>
-                  <span className="text-sm font-bold w-6 text-center">{quantity}</span>
+                  <span className="text-sm font-bold w-6 text-center">{isOutOfStock ? 0 : quantity}</span>
                   <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="w-9 h-9 rounded-xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-50 flex items-center justify-center cursor-pointer"
+                    type="button"
+                    disabled={isOutOfStock || quantity >= availableStock}
+                    onClick={() => {
+                      if (quantity < availableStock) {
+                        setQuantity(quantity + 1);
+                      } else {
+                        toastError("Stock Limit", `Cannot exceed available stock of ${availableStock}.`);
+                      }
+                    }}
+                    className="w-9 h-9 rounded-xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-50 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                   >
                     +
                   </button>
@@ -284,10 +428,13 @@ export default function ProductDetailPage({
             <div className="space-y-4 pt-6 border-t border-gray-100">
               <div className="flex items-center space-x-4">
                 <button
+                  type="button"
                   onClick={handleAddToCart}
-                  className="flex-1 bg-black hover:bg-gray-800 text-white text-xs font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+                  disabled={isOutOfStock}
+                  className="flex-1 bg-black hover:bg-gray-800 text-white text-xs font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-md transition disabled:bg-gray-300 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  <ShoppingBag size={18} /> Add to Cart
+                  <ShoppingBag size={18} />
+                  <span>{isOutOfStock ? "Out of Stock" : "Add to Cart"}</span>
                 </button>
 
                 <button
