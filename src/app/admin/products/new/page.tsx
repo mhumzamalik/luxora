@@ -47,26 +47,26 @@ export default function AddProductPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center justify-between border-b border-white/10 pb-4">
+      <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-gray-200/70 shadow-2xs">
         <Link
           href="/admin/products"
-          className="text-xs font-semibold text-gray-400 hover:text-white flex items-center gap-1.5 transition"
+          className="text-xs font-bold text-gray-600 hover:text-black flex items-center gap-1.5 transition"
         >
           <ArrowLeft size={16} /> Back to Products
         </Link>
-        <h1 className="text-xl font-serif font-extrabold text-white">Add New Product</h1>
+        <h1 className="text-xl font-serif font-extrabold text-gray-900">Add New Product</h1>
       </div>
 
       {errorMsg && (
-        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs font-bold">
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-bold">
           {errorMsg}
         </div>
       )}
 
-      <form onSubmit={handleSave} className="bg-[#161722] border border-white/10 p-6 md:p-8 rounded-3xl space-y-6 text-xs">
+      <form onSubmit={handleSave} className="bg-white border border-gray-200/70 p-6 md:p-8 rounded-3xl space-y-6 text-xs shadow-2xs">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <label className="font-bold text-gray-300 block mb-1">Product Title</label>
+            <label className="font-bold text-gray-800 block mb-1">Product Title</label>
             <input
               type="text"
               required
@@ -76,27 +76,27 @@ export default function AddProductPage() {
                 setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
               }}
               placeholder="e.g. Italian Leather Duffel Bag"
-              className="w-full bg-white/5 border border-white/10 text-white rounded-xl p-3 outline-hidden"
+              className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden focus:border-purple-600"
             />
           </div>
 
           <div>
-            <label className="font-bold text-gray-300 block mb-1">URL Slug</label>
+            <label className="font-bold text-gray-800 block mb-1">URL Slug</label>
             <input
               type="text"
               required
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 text-white rounded-xl p-3 outline-hidden font-mono"
+              className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden font-mono focus:border-purple-600"
             />
           </div>
 
           <div>
-            <label className="font-bold text-gray-300 block mb-1">Category</label>
+            <label className="font-bold text-gray-800 block mb-1">Category</label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 text-white rounded-xl p-3 outline-hidden"
+              className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden focus:border-purple-600"
             >
               <option value="women">Women</option>
               <option value="men">Men</option>
@@ -108,49 +108,49 @@ export default function AddProductPage() {
           </div>
 
           <div>
-            <label className="font-bold text-gray-300 block mb-1">Price ($)</label>
+            <label className="font-bold text-gray-800 block mb-1">Price (PKR)</label>
             <input
               type="number"
-              step="0.01"
+              step="1"
               required
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              placeholder="299.00"
-              className="w-full bg-white/5 border border-white/10 text-white rounded-xl p-3 outline-hidden"
+              placeholder="12999"
+              className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden focus:border-purple-600"
             />
           </div>
 
           <div>
-            <label className="font-bold text-gray-300 block mb-1">Stock Quantity</label>
+            <label className="font-bold text-gray-800 block mb-1">Stock Quantity</label>
             <input
               type="number"
               required
               value={stock}
               onChange={(e) => setStock(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 text-white rounded-xl p-3 outline-hidden"
+              className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden focus:border-purple-600"
             />
           </div>
 
           <div className="md:col-span-2">
-            <label className="font-bold text-gray-300 block mb-1">Description</label>
+            <label className="font-bold text-gray-800 block mb-1">Description</label>
             <textarea
               rows={4}
               required
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe craftsmanship, specifications..."
-              className="w-full bg-white/5 border border-white/10 text-white rounded-xl p-3 outline-hidden"
+              className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden focus:border-purple-600"
             />
           </div>
 
           <div className="md:col-span-2 space-y-2">
-            <label className="font-bold text-gray-300 block">Image URL</label>
+            <label className="font-bold text-gray-800 block">Image URL</label>
             <input
               type="url"
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
               placeholder="https://images.unsplash.com/photo-..."
-              className="w-full bg-white/5 border border-white/10 text-white rounded-xl p-3 outline-hidden font-mono"
+              className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden font-mono focus:border-purple-600"
             />
           </div>
         </div>
@@ -158,10 +158,10 @@ export default function AddProductPage() {
         <button
           type="submit"
           disabled={isSaving}
-          className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-2"
+          className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
         >
-          {isSaving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-          <span>{isSaving ? "Saving Product..." : "Save Product to Catalog"}</span>
+          {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+          <span>{isSaving ? "Saving Product..." : "Save Product"}</span>
         </button>
       </form>
     </div>

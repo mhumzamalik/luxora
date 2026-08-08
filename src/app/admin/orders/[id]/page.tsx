@@ -77,17 +77,17 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
 
   if (isLoading) {
     return (
-      <div className="p-12 flex justify-center items-center text-purple-400 gap-2">
+      <div className="p-12 flex justify-center items-center text-purple-600 gap-2">
         <Loader2 className="animate-spin" size={24} />
-        <span className="text-xs">Loading order details...</span>
+        <span className="text-xs font-semibold">Loading order details...</span>
       </div>
     );
   }
 
   if (error || !order) {
     return (
-      <div className="p-12 text-center text-red-400 text-xs">
-        Failed to load order details.
+      <div className="p-12 text-center text-rose-600 text-xs font-bold">
+        Failed to load order details. Please return to Orders menu.
       </div>
     );
   }
@@ -102,24 +102,24 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   return (
     <div className="space-y-6">
       {/* Top Header Navigation */}
-      <div className="flex justify-between items-center border-b border-white/10 pb-4">
+      <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-200/70 shadow-2xs">
         <Link
           href="/admin/orders"
-          className="text-xs font-semibold text-gray-400 hover:text-white flex items-center gap-1.5 transition"
+          className="text-xs font-bold text-gray-600 hover:text-black flex items-center gap-1.5 transition"
         >
           <ArrowLeft size={16} /> Back to Orders
         </Link>
-        <span className="text-xs text-gray-400 font-mono">
-          Order ID: <strong className="text-white">{order.orderNumber || order.id}</strong>
+        <span className="text-xs text-gray-500 font-mono">
+          Order Number: <strong className="text-gray-900">{order.orderNumber || order.id}</strong>
         </span>
       </div>
 
       {verifiedSuccess && (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-4 rounded-2xl text-xs font-semibold flex items-center gap-3 animate-in fade-in">
-          <CheckCircle2 size={20} className="text-emerald-400 flex-shrink-0" />
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl text-xs font-semibold flex items-center gap-3 animate-in fade-in">
+          <CheckCircle2 size={20} className="text-emerald-600 flex-shrink-0" />
           <div>
             <p className="font-bold">Bank Transfer Verified & Order Marked as PAID!</p>
-            <p className="text-[11px] text-emerald-300 mt-0.5">
+            <p className="text-[11px] text-emerald-700 mt-0.5">
               Inventory stock decremented automatically. Confirmation email sent to {order.user?.email}.
             </p>
           </div>
@@ -130,35 +130,35 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
         {/* Left Column: Verification Action & Proof Image */}
         <div className="lg:col-span-7 space-y-6">
           {/* Payment Status Card */}
-          <div className="bg-[#161722] border border-white/10 p-6 rounded-3xl space-y-4">
-            <div className="flex justify-between items-center border-b border-white/10 pb-4">
+          <div className="bg-white border border-gray-200/70 p-6 rounded-3xl space-y-4 shadow-2xs">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-4">
               <div className="flex items-center space-x-2">
-                <Landmark size={20} className="text-purple-400" />
-                <h3 className="text-base font-serif font-bold text-white">
+                <Landmark size={20} className="text-purple-600" />
+                <h3 className="text-base font-serif font-bold text-gray-900">
                   Bank Transfer Verification
                 </h3>
               </div>
               {order.paymentStatus === "PAID" ? (
-                <span className="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
                   <CheckCircle2 size={14} /> VERIFIED & PAID
                 </span>
               ) : (
-                <span className="bg-amber-500/20 text-amber-400 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                <span className="bg-amber-50 text-amber-700 text-xs font-bold px-3 py-1 rounded-full border border-amber-200 flex items-center gap-1">
                   <Clock size={14} /> PENDING ADMIN VERIFICATION
                 </span>
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4 text-xs bg-white/5 p-4 rounded-2xl">
+            <div className="grid grid-cols-2 gap-4 text-xs bg-gray-50/80 p-4 rounded-2xl border border-gray-100">
               <div>
                 <span className="text-gray-400 block text-[10px]">Bank Reference Code</span>
-                <span className="font-mono font-extrabold text-purple-400 text-sm">
+                <span className="font-mono font-extrabold text-purple-600 text-sm">
                   {order.bankReference || "N/A"}
                 </span>
               </div>
               <div>
                 <span className="text-gray-400 block text-[10px]">Total Amount</span>
-                <span className="font-extrabold text-white text-sm">
+                <span className="font-extrabold text-gray-900 text-sm">
                   {formatCurrency(order.total)}
                 </span>
               </div>
@@ -167,10 +167,10 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
             {/* Uploaded Payment Proof Image Preview */}
             {order.proofImageUrl && (
               <div className="space-y-2">
-                <span className="text-xs font-bold text-gray-300 block">
+                <span className="text-xs font-bold text-gray-700 block">
                   Uploaded Payment Receipt / Proof:
                 </span>
-                <div className="relative w-full h-64 bg-black/40 rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center p-2">
+                <div className="relative w-full h-64 bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 flex items-center justify-center p-2">
                   <Image
                     src={order.proofImageUrl}
                     alt="Proof of Payment"
@@ -186,7 +186,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               <button
                 onClick={() => verifyMutation.mutate()}
                 disabled={verifyMutation.isPending}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-4 rounded-2xl shadow-xl transition flex items-center justify-center gap-2"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-4 rounded-2xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 {verifyMutation.isPending ? <Loader2 className="animate-spin" size={18} /> : <FileCheck size={18} />}
                 <span>
@@ -199,21 +199,21 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           </div>
 
           {/* Ordered Items Table */}
-          <div className="bg-[#161722] border border-white/10 p-6 rounded-3xl space-y-4">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Package size={16} className="text-purple-400" /> Ordered Items
+          <div className="bg-white border border-gray-200/70 p-6 rounded-3xl space-y-4 shadow-2xs">
+            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+              <Package size={16} className="text-purple-600" /> Ordered Items
             </h3>
 
-            <div className="space-y-3 divide-y divide-white/5 text-xs">
+            <div className="space-y-3 divide-y divide-gray-100 text-xs">
               {order.items.map((item) => (
                 <div key={item.id} className="pt-3 first:pt-0 flex justify-between items-center">
                   <div>
-                    <div className="font-bold text-white">{item.productName || item.product?.name}</div>
+                    <div className="font-bold text-gray-900">{item.productName || item.product?.name}</div>
                     <div className="text-[11px] text-gray-400">SKU: {item.variantSku || item.variant?.sku || "N/A"}</div>
                   </div>
                   <div className="text-right">
-                    <span className="font-bold text-white block">{formatCurrency(item.price)}</span>
-                    <span className="text-gray-400 text-[11px]">Qty: {item.quantity}</span>
+                    <span className="font-bold text-gray-900 block">{formatCurrency(item.price)}</span>
+                    <span className="text-gray-500 text-[11px]">Qty: {item.quantity}</span>
                   </div>
                 </div>
               ))}
@@ -223,29 +223,29 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
 
         {/* Right Column: Customer Info & Shipping Address */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="bg-[#161722] border border-white/10 p-6 rounded-3xl space-y-4 text-xs">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-white/10 pb-3">
-              <User size={16} className="text-purple-400" /> Customer Information
+          <div className="bg-white border border-gray-200/70 p-6 rounded-3xl space-y-4 text-xs shadow-2xs">
+            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+              <User size={16} className="text-purple-600" /> Customer Information
             </h3>
 
             <div className="space-y-2">
               <div>
                 <span className="text-gray-400 block text-[10px]">Full Name</span>
-                <span className="font-bold text-white text-sm">{order.user?.name || "Customer"}</span>
+                <span className="font-bold text-gray-900 text-sm">{order.user?.name || "Customer"}</span>
               </div>
 
               <div>
                 <span className="text-gray-400 block text-[10px]">Email Address</span>
-                <span className="text-gray-200">{order.user?.email}</span>
+                <span className="text-gray-700">{order.user?.email}</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-[#161722] border border-white/10 p-6 rounded-3xl space-y-4 text-xs">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-white/10 pb-3">
-              <MapPin size={16} className="text-purple-400" /> Shipping Address
+          <div className="bg-white border border-gray-200/70 p-6 rounded-3xl space-y-4 text-xs shadow-2xs">
+            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+              <MapPin size={16} className="text-purple-600" /> Shipping Address
             </h3>
-            <p className="text-gray-300 leading-relaxed">{shippingAddr}</p>
+            <p className="text-gray-700 leading-relaxed">{shippingAddr}</p>
           </div>
         </div>
       </div>

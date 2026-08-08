@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Shield, Landmark, Save, Clock, Loader2 } from "lucide-react";
+import { Shield, Landmark, Save, Loader2, CheckCircle2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api-client";
 
@@ -29,98 +29,95 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="space-y-8 max-w-4xl">
-      <div className="border-b border-white/10 pb-6">
-        <h1 className="text-2xl font-serif font-extrabold text-white">
-          Settings & Audit Trail
+      <div className="bg-white p-6 rounded-3xl border border-gray-200/70 shadow-2xs">
+        <h1 className="text-2xl font-serif font-bold text-gray-900">
+          Settings & System Audit Trail
         </h1>
-        <p className="text-xs text-gray-400 mt-1">
-          Configure store bank transfer details and review system audit history.
+        <p className="text-xs text-gray-500 mt-1">
+          Configure store bank transfer details, administrative preferences, and review audit history.
         </p>
       </div>
 
       {bankSaved && (
-        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-emerald-400 text-xs font-bold">
-          Bank details successfully saved.
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-2">
+          <CheckCircle2 size={18} className="text-emerald-600" />
+          <span>Bank transfer account details successfully updated and saved.</span>
         </div>
       )}
 
       {/* Store Bank Configuration Card */}
-      <form onSubmit={handleSaveBank} className="bg-[#161722] border border-white/10 p-6 rounded-3xl space-y-4 text-xs">
-        <h3 className="text-base font-serif font-bold text-white flex items-center gap-2 border-b border-white/10 pb-3">
-          <Landmark size={18} className="text-purple-400" /> Bank Transfer Account Configuration
+      <form onSubmit={handleSaveBank} className="bg-white border border-gray-200/70 p-6 rounded-3xl space-y-4 text-xs shadow-2xs">
+        <h3 className="text-base font-serif font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+          <Landmark size={18} className="text-purple-600" /> Direct Bank Transfer Configuration
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="font-bold text-gray-300 block mb-1">Bank Name</label>
+            <label className="font-bold text-gray-700 block mb-1">Bank Name</label>
             <input
               type="text"
-              defaultValue="Luxora National Bank"
-              className="w-full bg-white/5 border border-white/10 text-white rounded-xl p-3 outline-hidden"
+              defaultValue="Standard Chartered Bank / HBL"
+              className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden focus:border-purple-600"
             />
           </div>
 
           <div>
-            <label className="font-bold text-gray-300 block mb-1">Account Name</label>
+            <label className="font-bold text-gray-700 block mb-1">Account Title / Name</label>
             <input
               type="text"
-              defaultValue="LUXORA RETAIL GROUP INC"
-              className="w-full bg-white/5 border border-white/10 text-white rounded-xl p-3 outline-hidden"
+              defaultValue="LUXORA RETAIL PRIVATE LIMITED"
+              className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden focus:border-purple-600"
             />
           </div>
 
           <div>
-            <label className="font-bold text-gray-300 block mb-1">Account Number</label>
+            <label className="font-bold text-gray-700 block mb-1">IBAN / Account Number</label>
             <input
               type="text"
-              defaultValue="1092-8837-4412-9901"
-              className="w-full bg-white/5 border border-white/10 text-white rounded-xl p-3 outline-hidden font-mono"
+              defaultValue="PK36SCBL0000001123456701"
+              className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden font-mono focus:border-purple-600"
             />
           </div>
 
           <div>
-            <label className="font-bold text-gray-300 block mb-1">SWIFT / BIC Code</label>
+            <label className="font-bold text-gray-700 block mb-1">Branch Code / SWIFT</label>
             <input
               type="text"
-              defaultValue="LUXUS33XXX"
-              className="w-full bg-white/5 border border-white/10 text-white rounded-xl p-3 outline-hidden font-mono"
+              defaultValue="SCBLPKKAXXX"
+              className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden font-mono focus:border-purple-600"
             />
           </div>
         </div>
 
-        <button type="submit" className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded-xl transition flex items-center gap-2">
-          <Save size={15} /> Save Bank Settings
+        <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-xl transition flex items-center gap-2 cursor-pointer shadow-md">
+          <Save size={15} /> Save Bank Details
         </button>
       </form>
 
       {/* Admin Audit Trail Card */}
-      <div className="bg-[#161722] border border-white/10 p-6 rounded-3xl space-y-4 text-xs">
-        <h3 className="text-base font-serif font-bold text-white flex items-center gap-2 border-b border-white/10 pb-3">
-          <Shield size={18} className="text-emerald-400" /> Admin Audit Logs
+      <div className="bg-white border border-gray-200/70 p-6 rounded-3xl space-y-4 text-xs shadow-2xs">
+        <h3 className="text-base font-serif font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+          <Shield size={18} className="text-purple-600" /> Admin Audit Logs
         </h3>
 
         {isLoading ? (
-          <div className="p-8 flex justify-center text-purple-400 gap-2">
+          <div className="p-8 flex justify-center items-center text-purple-600 gap-2">
             <Loader2 className="animate-spin" size={20} />
-            <span>Loading audit history...</span>
+            <span>Loading audit log...</span>
           </div>
         ) : auditLogs.length === 0 ? (
-          <div className="p-8 text-center text-gray-400 text-xs">
-            No audit logs recorded yet.
-          </div>
+          <p className="text-gray-400 py-4 text-center">No recent admin audit actions recorded.</p>
         ) : (
-          <div className="space-y-3 divide-y divide-white/5">
+          <div className="divide-y divide-gray-100">
             {auditLogs.map((log) => (
-              <div key={log.id} className="pt-3 first:pt-0 flex justify-between items-center">
+              <div key={log.id} className="py-3 flex items-center justify-between">
                 <div>
-                  <span className="font-mono font-bold text-purple-400 block">{log.action}</span>
-                  <span className="text-gray-300">
-                    {log.target ? `${log.target} by ` : ""}
-                    {log.user?.email || "System Admin"}
-                  </span>
+                  <span className="font-bold text-gray-900">{log.action}</span>
+                  {log.target && <span className="text-gray-500 ml-2">({log.target})</span>}
+                  <div className="text-[11px] text-gray-400">By {log.user?.email || "Admin"}</div>
                 </div>
-                <span className="text-gray-500 text-[11px] flex items-center gap-1">
-                  <Clock size={12} /> {new Date(log.createdAt).toLocaleString()}
+                <span className="text-[11px] text-gray-400 font-mono">
+                  {new Date(log.createdAt).toLocaleString()}
                 </span>
               </div>
             ))}

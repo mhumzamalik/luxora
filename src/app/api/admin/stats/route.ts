@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await auth();
     if (
@@ -12,48 +12,220 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const period = searchParams.get("period") || "30d";
+
+    const now = new Date();
+    let periodDays = 30;
+    if (period === "7d") periodDays = 7;
+    else if (period === "90d") periodDays = 90;
+    else if (period === "all") periodDays = 3650; // ~10 years
+
+    const currentPeriodStart = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
+    const previousPeriodStart = new Date(now.getTime() - periodDays * 2 * 24 * 60 * 60 * 1000);
+
+    // Parallel DB Aggregations
     const [
-      totalRevenueResult,
-      totalOrders,
-      pendingOrders,
-      totalCustomers,
-      totalProducts,
+      currentRevenueAgg,
+      previousRevenueAgg,
+      currentOrdersCount,
+      previousOrdersCount,
+      pendingOrdersCount,
+      currentCustomersCount,
+      previousCustomersCount,
+      currentProductsCount,
+      previousProductsCount,
       recentOrders,
       lowStockVariants,
+      orderItemsAgg,
     ] = await Promise.all([
+      // Revenue current period
       prisma.order.aggregate({
         _sum: { total: true },
-        where: { paymentStatus: "PAID" },
+        where: {
+          paymentStatus: "PAID",
+          ...(period !== "all" ? { createdAt: { gte: currentPeriodStart } } : {}),
+        },
       }),
-      prisma.order.count(),
+      // Revenue previous period
+      prisma.order.aggregate({
+        _sum: { total: true },
+        where: {
+          paymentStatus: "PAID",
+          ...(period !== "all"
+            ? { createdAt: { gte: previousPeriodStart, lt: currentPeriodStart } }
+            : {}),
+        },
+      }),
+      // Orders current period
+      prisma.order.count({
+        where: period !== "all" ? { createdAt: { gte: currentPeriodStart } } : {},
+      }),
+      // Orders previous period
+      prisma.order.count({
+        where:
+          period !== "all"
+            ? { createdAt: { gte: previousPeriodStart, lt: currentPeriodStart } }
+            : {},
+      }),
+      // Pending verification orders
       prisma.order.count({ where: { status: "PENDING" } }),
-      prisma.user.count({ where: { role: "CUSTOMER" } }),
+      // Customers current period
+      prisma.user.count({
+        where: {
+          role: "CUSTOMER",
+          ...(period !== "all" ? { createdAt: { gte: currentPeriodStart } } : {}),
+        },
+      }),
+      // Customers previous period
+      prisma.user.count({
+        where: {
+          role: "CUSTOMER",
+          ...(period !== "all"
+            ? { createdAt: { gte: previousPeriodStart, lt: currentPeriodStart } }
+            : {}),
+        },
+      }),
+      // Products total count
       prisma.product.count(),
+      // Products count before current period
+      prisma.product.count({
+        where: period !== "all" ? { createdAt: { lt: currentPeriodStart } } : {},
+      }),
+      // Recent orders queue
       prisma.order.findMany({
-        take: 5,
+        take: 6,
         orderBy: { createdAt: "desc" },
         include: {
           user: { select: { name: true, email: true } },
-          items: { include: { product: true } },
+          items: {
+            take: 1,
+            include: { product: { include: { images: true } } },
+          },
         },
       }),
+      // Low stock variant alerts
       prisma.productVariant.findMany({
-        where: { stock: { lte: 5 } },
-        include: { product: true },
-        take: 10,
+        where: { stock: { lte: 10 } },
+        include: {
+          product: {
+            include: { images: true },
+          },
+        },
+        orderBy: { stock: "asc" },
+        take: 6,
+      }),
+      // Order items aggregated for best sellers
+      prisma.orderItem.groupBy({
+        by: ["productId"],
+        _sum: {
+          quantity: true,
+          totalPrice: true,
+        },
+        orderBy: {
+          _sum: {
+            quantity: "desc",
+          },
+        },
+        take: 6,
       }),
     ]);
 
-    const totalRevenue = totalRevenueResult._sum.total || 0;
+    // Format KPI Values & Changes
+    const totalRevenue = currentRevenueAgg._sum.total || 0;
+    const prevRevenue = previousRevenueAgg._sum.total || 0;
+    const revenueChange =
+      prevRevenue > 0
+        ? parseFloat((((totalRevenue - prevRevenue) / prevRevenue) * 100).toFixed(1))
+        : totalRevenue > 0
+        ? 100
+        : 0;
+
+    const ordersChange =
+      previousOrdersCount > 0
+        ? parseFloat((((currentOrdersCount - previousOrdersCount) / previousOrdersCount) * 100).toFixed(1))
+        : currentOrdersCount > 0
+        ? 100
+        : 0;
+
+    const customersChange =
+      previousCustomersCount > 0
+        ? parseFloat((((currentCustomersCount - previousCustomersCount) / previousCustomersCount) * 100).toFixed(1))
+        : currentCustomersCount > 0
+        ? 100
+        : 0;
+
+    const productsChange =
+      previousProductsCount > 0
+        ? parseFloat((((currentProductsCount - previousProductsCount) / previousProductsCount) * 100).toFixed(1))
+        : 0;
+
+    // Fetch Best Sellers Product details
+    const bestSellerIds = orderItemsAgg.map((item) => item.productId);
+    const bestSellerProducts = await prisma.product.findMany({
+      where: { id: { in: bestSellerIds } },
+      include: { images: true },
+    });
+
+    const bestSellers = orderItemsAgg.map((item) => {
+      const prod = bestSellerProducts.find((p) => p.id === item.productId);
+      const primaryImage =
+        prod?.images?.find((img) => img.isPrimary)?.url ||
+        prod?.images?.[0]?.url ||
+        "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=300&q=80";
+
+      return {
+        id: item.productId,
+        name: prod?.name || "Product Item",
+        image: primaryImage,
+        unitsSold: item._sum.quantity || 0,
+        revenue: item._sum.totalPrice || 0,
+      };
+    });
+
+    // Format Low Stock Products
+    const formattedLowStock = lowStockVariants.map((variant) => {
+      const primaryImage =
+        variant.product.images?.find((img) => img.isPrimary)?.url ||
+        variant.product.images?.[0]?.url ||
+        "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=300&q=80";
+
+      return {
+        id: variant.id,
+        productId: variant.productId,
+        name: `${variant.product.name}${variant.color || variant.size ? ` (${[variant.color, variant.size].filter(Boolean).join(" / ")})` : ""}`,
+        sku: variant.sku,
+        image: primaryImage,
+        stock: variant.stock,
+        status: variant.stock === 0 ? "Out of Stock" : variant.stock <= 5 ? "Critical Stock" : "Low Stock",
+      };
+    });
 
     return NextResponse.json({
-      totalRevenue,
-      totalOrders,
-      pendingOrders,
-      totalCustomers,
-      totalProducts,
+      period,
+      periodLabel: period === "7d" ? "last 7 days" : period === "90d" ? "last 90 days" : period === "all" ? "all time" : "last 30 days",
+      kpis: {
+        revenue: {
+          value: totalRevenue,
+          change: revenueChange,
+        },
+        orders: {
+          value: currentOrdersCount,
+          pending: pendingOrdersCount,
+          change: ordersChange,
+        },
+        customers: {
+          value: currentCustomersCount,
+          change: customersChange,
+        },
+        products: {
+          value: currentProductsCount,
+          change: productsChange,
+        },
+      },
       recentOrders,
-      lowStockVariants,
+      bestSellers,
+      lowStockProducts: formattedLowStock,
     });
   } catch (error) {
     console.error("GET /api/admin/stats error:", error);
