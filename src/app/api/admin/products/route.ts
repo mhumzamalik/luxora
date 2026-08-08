@@ -56,7 +56,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { name, slug, description, price, categorySlug, stock, imageUrl } = body;
+    const { name, slug, description, price, categorySlug, stock, imageUrl, images } = body;
 
     // Find category or default
     let category = await prisma.category.findFirst({
@@ -72,6 +72,27 @@ export async function POST(req: Request) {
       });
     }
 
+    // Build images payload — prefer the new `images` array; fall back to legacy `imageUrl`
+    type ImageInput = { url: string; isPrimary?: boolean };
+    let imageCreatePayload: ImageInput[] | undefined;
+
+    if (Array.isArray(images) && images.length > 0) {
+      // Validate each entry has a non-empty URL string
+      const valid = (images as ImageInput[]).filter(
+        (img) => img && typeof img.url === "string" && img.url.trim().length > 0
+      );
+      if (valid.length > 0) {
+        // Ensure exactly one primary; if none marked, make first primary
+        const hasPrimary = valid.some((img) => img.isPrimary);
+        imageCreatePayload = valid.map((img, idx) => ({
+          url: img.url.trim(),
+          isPrimary: hasPrimary ? Boolean(img.isPrimary) : idx === 0,
+        }));
+      }
+    } else if (imageUrl && typeof imageUrl === "string" && imageUrl.trim().length > 0) {
+      imageCreatePayload = [{ url: imageUrl.trim(), isPrimary: true }];
+    }
+
     const product = await prisma.product.create({
       data: {
         name,
@@ -79,10 +100,8 @@ export async function POST(req: Request) {
         description: description || name,
         price: parseFloat(price),
         categoryId: category.id,
-        images: imageUrl
-          ? {
-              create: [{ url: imageUrl, isPrimary: true }],
-            }
+        images: imageCreatePayload
+          ? { create: imageCreatePayload }
           : undefined,
         variants: {
           create: [
