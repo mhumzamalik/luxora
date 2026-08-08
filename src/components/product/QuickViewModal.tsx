@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-import { X, Star, ShoppingBag, Heart } from "lucide-react";
+import { X, Star, ShoppingBag, Heart, Zap } from "lucide-react";
 import { useQuickViewStore } from "@/store/quick-view-store";
 import { useCartStore } from "@/store/cart-store";
 import { useWishlistStore } from "@/store/wishlist-store";
@@ -103,12 +103,20 @@ export function QuickViewModal() {
                 </span>
               </div>
 
+              {/* Flash Sale Banner */}
+              {product.isFlashSale && product.flashSaleTitle && (
+                <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-xl mt-3">
+                  <Zap size={12} className="fill-amber-500 text-amber-500 shrink-0" />
+                  <span>{product.flashSaleTitle} — Limited Time</span>
+                </div>
+              )}
+
               {/* Price */}
               <div className="flex items-baseline space-x-2 mt-3">
-                <span className="text-2xl font-extrabold text-gray-900">
+                <span className={`text-2xl font-extrabold ${product.isFlashSale ? "text-purple-700" : "text-gray-900"}`}>
                   {formatCurrency(product.price)}
                 </span>
-                {product.comparePrice && (
+                {product.comparePrice && product.comparePrice > product.price && (
                   <span className="text-sm text-gray-400 line-through">
                     {formatCurrency(product.comparePrice)}
                   </span>

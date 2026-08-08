@@ -107,3 +107,39 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Failed to create product" }, { status: 500 });
   }
 }
+
+export async function PATCH(req: Request) {
+  try {
+    const session = await auth();
+    if (!session || (session.user.role !== "ADMIN" && session.user.role !== "MANAGER")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    const body = await req.json();
+    const { id, isBestSeller, isNewArrival, isFlashSale } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: "Product ID required" }, { status: 400 });
+    }
+
+    const updatedProduct = await prisma.product.update({
+      where: { id },
+      data: {
+        isBestSeller: typeof isBestSeller === "boolean" ? isBestSeller : undefined,
+        isNewArrival: typeof isNewArrival === "boolean" ? isNewArrival : undefined,
+        isFlashSale: typeof isFlashSale === "boolean" ? isFlashSale : undefined,
+      },
+      include: {
+        category: true,
+        images: true,
+        variants: true,
+      },
+    });
+
+    return NextResponse.json(updatedProduct);
+  } catch (error) {
+    console.error("PATCH /api/admin/products error:", error);
+    return NextResponse.json({ error: "Failed to update product visibility" }, { status: 500 });
+  }
+}
+

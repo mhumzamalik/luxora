@@ -3,72 +3,92 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Zap, ShoppingBag, ArrowRight } from "lucide-react";
+import { Zap, ShoppingBag, ArrowRight, Loader2, Clock } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchApi } from "@/lib/api-client";
 import { useCartStore } from "@/store/cart-store";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/components/ui/ToastProvider";
 
-const flashSaleProducts = [
-  {
-    id: "fs1",
-    name: "Leather Handbag",
-    slug: "leather-handbag-luxury",
-    price: 69.0,
-    comparePrice: 99.0,
-    badge: "-30%",
-    image: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=500&q=80",
-  },
-  {
-    id: "fs2",
-    name: "Galaxy Buds2 Pro",
-    slug: "galaxy-buds2-pro",
-    price: 129.0,
-    comparePrice: 169.0,
-    badge: "-25%",
-    image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=500&q=80",
-  },
-  {
-    id: "fs3",
-    name: "Oversized Hoodie",
-    slug: "oversized-hoodie-cotton",
-    price: 44.0,
-    comparePrice: 69.0,
-    badge: "-35%",
-    image: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=500&q=80",
-  },
-  {
-    id: "fs4",
-    name: "Fossil Chronograph",
-    slug: "fossil-chronograph-watch",
-    price: 119.0,
-    comparePrice: 199.0,
-    badge: "-40%",
-    image: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=500&q=80",
-  },
-];
+interface FlashSaleProduct {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  comparePrice: number;
+  badge: string;
+  image: string;
+  stock: number;
+  category?: string;
+}
+
+interface HomepageData {
+  flashSale: {
+    id: string;
+    title: string;
+    startDate: string;
+    endDate: string;
+    isActive: boolean;
+    products: FlashSaleProduct[];
+  } | null;
+}
 
 export function FlashSaleBlock() {
   const cartStore = useCartStore();
-  const { success: toastSuccess } = useToast();
+  const { success: toastSuccess, error: toastError } = useToast();
+
+  const { data, isLoading } = useQuery<HomepageData>({
+    queryKey: ["homepage"],
+    queryFn: () => fetchApi("/api/homepage"),
+  });
+
+  const flashSale = data?.flashSale;
+
   const [timeLeft, setTimeLeft] = useState({
-    hours: 2,
-    minutes: 18,
-    seconds: 34,
-    ms: 56,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    ms: 0,
   });
 
   useEffect(() => {
+    if (!flashSale?.endDate) return;
+
+    const targetTime = new Date(flashSale.endDate).getTime();
+
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev.ms > 0) return { ...prev, ms: prev.ms - 1 };
-        if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1, ms: 99 };
-        if (prev.minutes > 0) return { ...prev, minutes: prev.minutes - 1, seconds: 59, ms: 99 };
-        if (prev.hours > 0) return { ...prev, hours: prev.hours - 1, minutes: 59, seconds: 59, ms: 99 };
-        return prev;
-      });
+      const now = Date.now();
+      const diff = targetTime - now;
+
+      if (diff <= 0) {
+        setTimeLeft({ hours: 0, minutes: 0, seconds: 0, ms: 0 });
+        clearInterval(timer);
+      } else {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        const ms = Math.floor((diff % 1000) / 10);
+        setTimeLeft({ hours, minutes, seconds, ms });
+      }
     }, 10);
+
     return () => clearInterval(timer);
-  }, []);
+  }, [flashSale?.endDate]);
+
+  if (isLoading) {
+    return (
+      <section className="w-full max-w-7xl mx-auto px-4 md:px-8 py-8">
+        <div className="bg-[#0F1016] text-white rounded-3xl p-10 flex justify-center items-center gap-3">
+          <Loader2 className="animate-spin text-amber-400" size={24} />
+          <span className="text-xs font-bold text-gray-300">Loading flash sale deals...</span>
+        </div>
+      </section>
+    );
+  }
+
+  if (!flashSale || !flashSale.products || flashSale.products.length === 0) {
+    return null; // Gracefully hide section if no flash sale campaign active
+  }
 
   return (
     <section className="w-full max-w-7xl mx-auto px-4 md:px-8 py-8">
@@ -78,37 +98,37 @@ export function FlashSaleBlock() {
           <div className="lg:col-span-4 space-y-6">
             <div>
               <div className="inline-flex items-center gap-1.5 text-amber-400 font-extrabold text-2xl md:text-3xl">
-                <span>Flash Sale</span>
-                <Zap size={28} className="fill-amber-400 text-amber-400 animate-pulse" />
+                <span>{flashSale.title || "Flash Sale"}</span>
+                <Zap size={28} className="fill-amber-400 text-amber-400 animate-pulse shrink-0" />
               </div>
-              <p className="text-gray-400 text-xs md:text-sm mt-1">
-                Hurry up! Limited time offer
+              <p className="text-gray-400 text-xs md:text-sm mt-1 flex items-center gap-1">
+                <Clock size={14} className="text-amber-400" /> Hurry up! Limited time offer
               </p>
             </div>
 
             {/* Live Countdown Timer Grid */}
             <div className="grid grid-cols-4 gap-2 text-center max-w-xs">
               <div className="bg-white/10 backdrop-blur-md rounded-xl p-2.5 border border-white/10">
-                <span className="text-xl md:text-2xl font-extrabold font-mono block">
+                <span className="text-xl md:text-2xl font-extrabold font-mono block text-white">
                   {String(timeLeft.hours).padStart(2, "0")}
                 </span>
-                <span className="text-[10px] text-gray-400 uppercase tracking-wider block mt-0.5">
+                <span className="text-[10px] text-gray-400 uppercase tracking-wider block mt-0.5 font-bold">
                   Hours
                 </span>
               </div>
               <div className="bg-white/10 backdrop-blur-md rounded-xl p-2.5 border border-white/10">
-                <span className="text-xl md:text-2xl font-extrabold font-mono block">
+                <span className="text-xl md:text-2xl font-extrabold font-mono block text-white">
                   {String(timeLeft.minutes).padStart(2, "0")}
                 </span>
-                <span className="text-[10px] text-gray-400 uppercase tracking-wider block mt-0.5">
+                <span className="text-[10px] text-gray-400 uppercase tracking-wider block mt-0.5 font-bold">
                   Minutes
                 </span>
               </div>
               <div className="bg-white/10 backdrop-blur-md rounded-xl p-2.5 border border-white/10">
-                <span className="text-xl md:text-2xl font-extrabold font-mono block">
+                <span className="text-xl md:text-2xl font-extrabold font-mono block text-white">
                   {String(timeLeft.seconds).padStart(2, "0")}
                 </span>
-                <span className="text-[10px] text-gray-400 uppercase tracking-wider block mt-0.5">
+                <span className="text-[10px] text-gray-400 uppercase tracking-wider block mt-0.5 font-bold">
                   Seconds
                 </span>
               </div>
@@ -116,7 +136,7 @@ export function FlashSaleBlock() {
                 <span className="text-xl md:text-2xl font-extrabold font-mono text-indigo-400 block">
                   {String(timeLeft.ms).padStart(2, "0")}
                 </span>
-                <span className="text-[10px] text-gray-400 uppercase tracking-wider block mt-0.5">
+                <span className="text-[10px] text-gray-400 uppercase tracking-wider block mt-0.5 font-bold">
                   ms
                 </span>
               </div>
@@ -124,7 +144,7 @@ export function FlashSaleBlock() {
 
             {/* Action CTA Button */}
             <Link
-              href="/products?sale=flash"
+              href="/products?isFlashSale=true"
               className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs md:text-sm px-6 py-3.5 rounded-full shadow-lg transition"
             >
               <span>Shop All Deals</span>
@@ -134,56 +154,92 @@ export function FlashSaleBlock() {
 
           {/* Right Flash Products Grid */}
           <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {flashSaleProducts.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white text-gray-900 rounded-2xl p-3.5 flex flex-col justify-between hover:scale-103 transition-transform duration-300 shadow-md"
-              >
-                <div className="relative w-full aspect-square bg-gray-50 rounded-xl overflow-hidden mb-3">
-                  <span className="absolute top-2 left-2 z-10 bg-red-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full">
-                    {item.badge}
-                  </span>
-                  <Image
-                    src={item.image}
-                    alt={item.name}
-                    fill
-                    className="object-contain p-2"
-                  />
-                </div>
+            {flashSale.products.map((item) => {
+              const isOutOfStock = item.stock <= 0;
 
-                <div className="space-y-1">
-                  <h4 className="text-xs font-bold text-gray-900 truncate">
-                    {item.name}
-                  </h4>
-                  <div className="flex items-baseline space-x-1.5">
-                    <span className="text-sm font-extrabold text-gray-900">
-                      {formatCurrency(item.price)}
-                    </span>
-                    <span className="text-[11px] text-gray-400 line-through">
-                      {formatCurrency(item.comparePrice)}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    cartStore.addItem({
-                      id: item.id,
-                      name: item.name,
-                      slug: item.slug,
-                      price: item.price,
-                      comparePrice: item.comparePrice,
-                      image: item.image,
-                    });
-                    toastSuccess("Added to Bag", `${item.name} has been added to your shopping bag.`);
-                  }}
-                  className="mt-3 w-full bg-gray-100 hover:bg-black hover:text-white text-gray-800 text-[11px] font-bold py-2 rounded-xl transition flex items-center justify-center gap-1"
+              return (
+                <div
+                  key={item.id}
+                  className="bg-white text-gray-900 rounded-2xl p-3.5 flex flex-col justify-between hover:scale-103 transition-transform duration-300 shadow-md relative"
                 >
-                  <ShoppingBag size={12} />
-                  <span>Quick Add</span>
-                </button>
-              </div>
-            ))}
+                  <div className="relative w-full aspect-square bg-gray-50 rounded-xl overflow-hidden mb-3">
+                    <span className="absolute top-2 left-2 z-10 bg-rose-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full shadow-2xs">
+                      {item.badge}
+                    </span>
+
+                    {isOutOfStock && (
+                      <span className="absolute top-2 right-2 z-10 bg-gray-900/90 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
+                        Sold Out
+                      </span>
+                    )}
+
+                    <Link href={`/products/${item.slug}`}>
+                      <Image
+                        src={item.image}
+                        alt={item.name}
+                        fill
+                        className={`object-contain p-2 transition duration-300 ${isOutOfStock ? "opacity-60 grayscale" : ""}`}
+                      />
+                    </Link>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Link
+                      href={`/products/${item.slug}`}
+                      className="text-xs font-bold text-gray-900 truncate block hover:text-purple-600"
+                    >
+                      {item.name}
+                    </Link>
+
+                    <div className="flex items-baseline space-x-1.5">
+                      <span className="text-sm font-extrabold text-purple-700">
+                        {formatCurrency(item.price)}
+                      </span>
+                      {item.comparePrice > item.price && (
+                        <span className="text-[11px] text-gray-400 line-through">
+                          {formatCurrency(item.comparePrice)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-[10px] text-gray-500 font-semibold">
+                      {isOutOfStock ? (
+                        <span className="text-rose-600 font-bold">Out of Stock</span>
+                      ) : (
+                        <span className="text-emerald-700 font-bold">{item.stock} in stock</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    disabled={isOutOfStock}
+                    onClick={() => {
+                      if (isOutOfStock) {
+                        toastError("Out of Stock", `${item.name} is currently out of stock.`);
+                        return;
+                      }
+                      cartStore.addItem({
+                        id: item.id,
+                        name: item.name,
+                        slug: item.slug,
+                        price: item.price,
+                        comparePrice: item.comparePrice,
+                        image: item.image,
+                      });
+                      toastSuccess("Added to Bag", `${item.name} has been added to your shopping bag.`);
+                    }}
+                    className={`mt-3 w-full text-[11px] font-bold py-2 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer ${
+                      isOutOfStock
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-gray-100 hover:bg-black hover:text-white text-gray-800"
+                    }`}
+                  >
+                    <ShoppingBag size={12} />
+                    <span>{isOutOfStock ? "Sold Out" : "Quick Add"}</span>
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

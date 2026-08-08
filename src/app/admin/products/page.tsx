@@ -3,16 +3,20 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Plus, Search, Trash2, Loader2 } from "lucide-react";
+import { Plus, Search, Trash2, Loader2, Sparkles, Zap, Flame } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/currency";
+import { useToast } from "@/components/ui/ToastProvider";
 
 interface AdminProduct {
   id: string;
   name: string;
   slug: string;
   price: number;
+  isBestSeller?: boolean;
+  isNewArrival?: boolean;
+  isFlashSale?: boolean;
   category?: { name: string };
   images?: { url: string }[];
   variants?: { stock: number }[];
@@ -21,16 +25,35 @@ interface AdminProduct {
 export default function AdminProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const queryClient = useQueryClient();
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const { data: products = [], isLoading } = useQuery<AdminProduct[]>({
     queryKey: ["admin", "products"],
     queryFn: () => fetchApi("/api/admin/products"),
   });
 
+  const updateVisibilityMutation = useMutation({
+    mutationFn: (data: { id: string; isBestSeller?: boolean; isNewArrival?: boolean; isFlashSale?: boolean }) =>
+      fetchApi("/api/admin/products", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (updated: any) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+      queryClient.invalidateQueries({ queryKey: ["homepage"] });
+      toastSuccess("Visibility Updated", `Homepage visibility settings updated for ${updated.name || "product"}.`);
+    },
+    onError: () => {
+      toastError("Update Failed", "Failed to update product visibility flags.");
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => fetchApi(`/api/admin/products?id=${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+      queryClient.invalidateQueries({ queryKey: ["homepage"] });
+      toastSuccess("Product Deleted", "The product has been removed from catalog.");
     },
   });
 
@@ -38,6 +61,17 @@ export default function AdminProductsPage() {
     if (confirm("Are you sure you want to delete this product?")) {
       deleteMutation.mutate(id);
     }
+  };
+
+  const handleToggleVisibility = (
+    id: string,
+    field: "isBestSeller" | "isNewArrival" | "isFlashSale",
+    currentValue: boolean | undefined
+  ) => {
+    updateVisibilityMutation.mutate({
+      id,
+      [field]: !currentValue,
+    });
   };
 
   const filteredProducts = products.filter((p) =>
@@ -52,7 +86,7 @@ export default function AdminProductsPage() {
             Product & Catalog Management
           </h1>
           <p className="text-xs text-gray-500 mt-1">
-            Manage catalog items, monitor stock levels, and add new luxury items.
+            Manage catalog items, stock levels, and control homepage section visibility.
           </p>
         </div>
 
@@ -66,8 +100,8 @@ export default function AdminProductsPage() {
       </div>
 
       {/* Search Toolbar */}
-      <div className="bg-white p-4 rounded-2xl border border-gray-200/70 shadow-2xs flex justify-between items-center">
-        <div className="relative w-full sm:w-72">
+      <div className="bg-white p-4 rounded-2xl border border-gray-200/70 shadow-2xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div className="relative w-full sm:w-80">
           <input
             type="text"
             value={searchQuery}
@@ -76,6 +110,12 @@ export default function AdminProductsPage() {
             className="w-full bg-gray-50 text-xs text-gray-900 border border-gray-200 rounded-xl py-2.5 pl-9 pr-3 outline-hidden focus:border-purple-600"
           />
           <Search size={15} className="absolute left-3 top-3 text-gray-400" />
+        </div>
+
+        <div className="text-[11px] text-gray-500 flex items-center gap-4 font-medium">
+          <span className="flex items-center gap-1.5"><Flame size={13} className="text-amber-500" /> Best Seller</span>
+          <span className="flex items-center gap-1.5"><Sparkles size={13} className="text-blue-500" /> New Arrival</span>
+          <span className="flex items-center gap-1.5"><Zap size={13} className="text-purple-500" /> Flash Sale</span>
         </div>
       </div>
 
@@ -98,6 +138,7 @@ export default function AdminProductsPage() {
                 <th className="p-4">Category</th>
                 <th className="p-4">Price</th>
                 <th className="p-4">Stock Level</th>
+                <th className="p-4 text-center">Homepage Section Visibility</th>
                 <th className="p-4 text-center">Actions</th>
               </tr>
             </thead>
@@ -128,6 +169,57 @@ export default function AdminProductsPage() {
                       >
                         {totalStock} units
                       </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center justify-center gap-3">
+                        {/* Best Seller Toggle */}
+                        <label className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold cursor-pointer transition select-none ${
+                          prod.isBestSeller
+                            ? "bg-amber-50 border-amber-300 text-amber-800"
+                            : "bg-gray-50 border-gray-200 text-gray-400 hover:bg-gray-100"
+                        }`}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(prod.isBestSeller)}
+                            onChange={() => handleToggleVisibility(prod.id, "isBestSeller", prod.isBestSeller)}
+                            className="sr-only"
+                          />
+                          <Flame size={12} className={prod.isBestSeller ? "text-amber-500 fill-amber-500" : "text-gray-400"} />
+                          <span>Best Seller</span>
+                        </label>
+
+                        {/* New Arrival Toggle */}
+                        <label className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold cursor-pointer transition select-none ${
+                          prod.isNewArrival
+                            ? "bg-blue-50 border-blue-300 text-blue-800"
+                            : "bg-gray-50 border-gray-200 text-gray-400 hover:bg-gray-100"
+                        }`}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(prod.isNewArrival)}
+                            onChange={() => handleToggleVisibility(prod.id, "isNewArrival", prod.isNewArrival)}
+                            className="sr-only"
+                          />
+                          <Sparkles size={12} className={prod.isNewArrival ? "text-blue-500 fill-blue-500" : "text-gray-400"} />
+                          <span>New Arrival</span>
+                        </label>
+
+                        {/* Flash Sale Toggle */}
+                        <label className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold cursor-pointer transition select-none ${
+                          prod.isFlashSale
+                            ? "bg-purple-50 border-purple-300 text-purple-800"
+                            : "bg-gray-50 border-gray-200 text-gray-400 hover:bg-gray-100"
+                        }`}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(prod.isFlashSale)}
+                            onChange={() => handleToggleVisibility(prod.id, "isFlashSale", prod.isFlashSale)}
+                            className="sr-only"
+                          />
+                          <Zap size={12} className={prod.isFlashSale ? "text-purple-500 fill-purple-500" : "text-gray-400"} />
+                          <span>Flash Sale</span>
+                        </label>
+                      </div>
                     </td>
                     <td className="p-4 text-center">
                       <button

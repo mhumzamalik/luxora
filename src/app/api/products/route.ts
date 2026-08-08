@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
+import { resolveProductPricing } from "@/lib/pricing";
 
 export async function GET(req: Request) {
   try {
@@ -54,8 +55,9 @@ export async function GET(req: Request) {
       orderBy = { reviewCount: "desc" };
     }
 
+    const now = new Date();
     const total = await prisma.product.count({ where });
-    const products = await prisma.product.findMany({
+    const rawProducts = await prisma.product.findMany({
       where,
       orderBy,
       skip: (page - 1) * limit,
@@ -64,8 +66,15 @@ export async function GET(req: Request) {
         category: true,
         images: true,
         variants: true,
+        flashSaleItems: {
+          include: {
+            flashSale: true,
+          },
+        },
       },
     });
+
+    const products = rawProducts.map((p) => resolveProductPricing(p, now));
 
     return NextResponse.json({
       products,

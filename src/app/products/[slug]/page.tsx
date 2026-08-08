@@ -7,6 +7,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { QuickViewModal } from "@/components/product/QuickViewModal";
+import { Zap } from "lucide-react";
 import { Star, ShoppingBag, Heart, ShieldCheck, Truck, RotateCcw, Send } from "lucide-react";
 import { useCartStore } from "@/store/cart-store";
 import { useWishlistStore } from "@/store/wishlist-store";
@@ -47,6 +48,10 @@ interface ProductDetailData {
     badge?: string | null;
     rating: number;
     reviewCount: number;
+    isFlashSale?: boolean;
+    flashSaleTitle?: string;
+    flashSaleEndDate?: string;
+    originalPrice?: number;
     category?: { name: string; slug: string } | null;
     images: { url: string; isPrimary?: boolean }[];
     variants?: ProductVariantData[];
@@ -151,7 +156,8 @@ export default function ProductDetailPage({
         id: product.id,
         name: product.name,
         slug: product.slug,
-        price: selectedVariant?.price || product.price,
+        // product.price is already the server-resolved effective price (sale or regular)
+        price: product.price,
         comparePrice: product.comparePrice,
         image: activeImage,
         selectedColor: selectedColor || selectedVariant?.color || undefined,
@@ -298,16 +304,24 @@ export default function ProductDetailPage({
                 <span className="text-xs text-gray-400">({product.reviewCount} verified reviews)</span>
               </div>
 
+              {/* Flash Sale Banner */}
+              {product.isFlashSale && product.flashSaleTitle && (
+                <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-xl">
+                  <Zap size={13} className="fill-amber-500 text-amber-500 shrink-0" />
+                  <span>{product.flashSaleTitle} — Limited Time Offer</span>
+                </div>
+              )}
+
               {/* Price */}
               <div className="flex items-baseline space-x-3 pt-2">
-                <span className="text-3xl font-extrabold text-gray-900">
-                  {formatCurrency(selectedVariant?.price || product.price)}
+                <span className={`text-3xl font-extrabold ${product.isFlashSale ? "text-purple-700" : "text-gray-900"}`}>
+                  {formatCurrency(product.price)}
                 </span>
-                {product.comparePrice && (
+                {product.comparePrice && product.comparePrice > product.price && (
                   <span className="text-sm text-gray-400 line-through">{formatCurrency(product.comparePrice)}</span>
                 )}
                 {product.badge && (
-                  <span className="bg-red-500 text-white text-xs font-extrabold px-2.5 py-0.5 rounded-full">
+                  <span className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full text-white ${product.isFlashSale ? "bg-purple-600" : "bg-red-500"}`}>
                     {product.badge}
                   </span>
                 )}

@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { z } from "zod";
 import { resend } from "@/lib/resend";
 import { formatCurrency } from "@/lib/currency";
+import { resolveProductPricing } from "@/lib/pricing";
 
 const orderItemSchema = z.object({
   productId: z.string().min(1),
@@ -88,11 +89,20 @@ export async function POST(req: Request) {
       new Set(items.map((i) => i.variantId).filter((v): v is string => Boolean(v)))
     );
 
+    const now = new Date();
+
     // Batch read products and variants in parallel outside the transaction
     const [fetchedProducts, fetchedExplicitVariants, defaultVariants] =
       await Promise.all([
         prisma.product.findMany({
           where: { id: { in: productIds } },
+          include: {
+            flashSaleItems: {
+              include: {
+                flashSale: true,
+              },
+            },
+          },
         }),
         explicitVariantIds.length > 0
           ? prisma.productVariant.findMany({
@@ -104,7 +114,7 @@ export async function POST(req: Request) {
         }),
       ]);
 
-    const productMap = new Map(fetchedProducts.map((p) => [p.id, p]));
+    const productMap = new Map(fetchedProducts.map((p) => [p.id, resolveProductPricing(p, now)]));
     const variantMap = new Map(fetchedExplicitVariants.map((v) => [v.id, v]));
 
     let subtotal = 0;
@@ -146,14 +156,15 @@ export async function POST(req: Request) {
         );
       }
 
-      const lineTotal = product.price * item.quantity;
+      const effectiveUnitPrice = product.price;
+      const lineTotal = effectiveUnitPrice * item.quantity;
       subtotal += lineTotal;
 
       verifiedItems.push({
         productId: product.id,
         variantId: variant.id,
         quantity: item.quantity,
-        unitPrice: product.price,
+        unitPrice: effectiveUnitPrice,
         totalPrice: lineTotal,
       });
     }

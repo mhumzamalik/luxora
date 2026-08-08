@@ -15,6 +15,9 @@ export interface QuickViewProduct {
   colors?: Array<{ name: string; hex: string }>;
   sizes?: string[];
   stock: number;
+  isFlashSale?: boolean;
+  flashSaleTitle?: string;
+  flashSaleEndDate?: string;
 }
 
 interface QuickViewStore {

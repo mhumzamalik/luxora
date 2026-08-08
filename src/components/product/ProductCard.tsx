@@ -22,6 +22,9 @@ export interface ProductCardProps {
     badge?: string | null;
     rating: number;
     reviewCount: number;
+    isFlashSale?: boolean;
+    flashSaleTitle?: string;
+    flashSaleEndDate?: string;
     category?: string | { name: string; slug: string } | null;
     variants?: Array<{ id: string; stock: number }>;
     image?: string;
@@ -79,6 +82,9 @@ export function ProductCard({ product }: ProductCardProps) {
       category: typeof product.category === "string" ? product.category : product.category?.name || "Luxury",
       colors: product.colors,
       stock: 25,
+      isFlashSale: product.isFlashSale,
+      flashSaleTitle: product.flashSaleTitle,
+      flashSaleEndDate: product.flashSaleEndDate,
     };
     quickViewStore.openQuickView(quickViewItem);
   };
@@ -185,10 +191,10 @@ export function ProductCard({ product }: ProductCardProps) {
 
           {/* Pricing */}
           <div className="flex items-baseline space-x-2 pt-1">
-            <span className="text-sm md:text-base font-extrabold text-gray-900">
+            <span className={`text-sm md:text-base font-extrabold ${product.isFlashSale ? "text-purple-700" : "text-gray-900"}`}>
               {formatCurrency(product.price)}
             </span>
-            {product.comparePrice && (
+            {product.comparePrice && product.comparePrice > product.price && (
               <span className="text-xs text-gray-400 line-through font-normal">
                 {formatCurrency(product.comparePrice)}
               </span>

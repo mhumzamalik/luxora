@@ -1,10 +1,8 @@
-"use client";
-
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-const categoryItems = [
+const categories = [
   {
     name: "Women",
     slug: "women",
@@ -51,7 +49,7 @@ export function CategoryStrip() {
   return (
     <section className="w-full max-w-7xl mx-auto px-4 md:px-8 py-8">
       <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-8 gap-4 md:gap-6">
-        {categoryItems.map((cat) => (
+        {categories.map((cat) => (
           <Link
             key={cat.slug}
             href={`/products?category=${cat.slug}`}
