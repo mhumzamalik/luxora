@@ -5,10 +5,24 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { fetchApi } from "@/lib/api-client";
 
-const slides = [
+interface DBBanner {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  imageUrl: string;
+  mobileImageUrl: string | null;
+  linkUrl: string | null;
+  ctaText: string | null;
+  position: number;
+}
+
+const defaultSlides = [
   {
-    id: 1,
+    id: "default-1",
     tagline: "NEW COLLECTION",
     title: "Elevate Your Everyday",
     description:
@@ -24,7 +38,7 @@ const slides = [
     promoText: "Limited time offer",
   },
   {
-    id: 2,
+    id: "default-2",
     tagline: "SUMMER ESSENTIALS",
     title: "Modern Luxury Defined",
     description:
@@ -44,14 +58,42 @@ const slides = [
 export function HeroCarousel() {
   const [currentSlide, setCurrentSlide] = useState(0);
 
+  const { data: dbBanners = [] } = useQuery<DBBanner[]>({
+    queryKey: ["banners", "hero"],
+    queryFn: () => fetchApi("/api/banners?type=HERO"),
+  });
+
+  const activeSlides =
+    dbBanners.length > 0
+      ? dbBanners.map((b) => ({
+          id: b.id,
+          tagline: b.subtitle || "NEW COLLECTION",
+          title: b.title,
+          description:
+            b.description ||
+            "Discover timeless pieces crafted with premium materials for a luxurious lifestyle.",
+          primaryCta: b.ctaText || "Shop Now",
+          primaryLink: b.linkUrl || "/products",
+          secondaryCta: "Explore Collection",
+          secondaryLink: "/products",
+          image: b.imageUrl,
+          promoTitle: "Spring Sale",
+          promoDiscount: "30% OFF",
+          promoText: "Limited time offer",
+        }))
+      : defaultSlides;
+
   useEffect(() => {
+    if (activeSlides.length <= 1) return;
     const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % slides.length);
+      setCurrentSlide((prev) => (prev + 1) % activeSlides.length);
     }, 6000);
     return () => clearInterval(timer);
-  }, []);
+  }, [activeSlides.length]);
 
-  const slide = slides[currentSlide];
+  const slide = activeSlides[currentSlide] || activeSlides[0];
+
+  if (!slide) return null;
 
   return (
     <section className="relative w-full max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-8">
@@ -110,7 +152,7 @@ export function HeroCarousel() {
                 className="object-cover object-center rounded-2xl"
               />
 
-              {/* Floating Soft Blue/Purple Sale Widget (Matching Reference Screenshot) */}
+              {/* Floating Sale Card */}
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -138,18 +180,20 @@ export function HeroCarousel() {
         </AnimatePresence>
 
         {/* Carousel Dots */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-2 z-20">
-          {slides.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => setCurrentSlide(idx)}
-              className={`h-2 rounded-full transition-all ${
-                currentSlide === idx ? "w-8 bg-black" : "w-2 bg-gray-300"
-              }`}
-              aria-label={`Go to slide ${idx + 1}`}
-            />
-          ))}
-        </div>
+        {activeSlides.length > 1 && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-2 z-20">
+            {activeSlides.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentSlide(idx)}
+                className={`h-2 rounded-full transition-all ${
+                  currentSlide === idx ? "w-8 bg-black" : "w-2 bg-gray-300"
+                }`}
+                aria-label={`Go to slide ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
