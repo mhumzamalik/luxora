@@ -157,11 +157,13 @@ export default function CheckoutPage() {
       });
       const json = await res.json();
 
-      if (json.url) {
-        setPaymentProofUrl(json.url);
+      if (res.ok && json.path) {
+        // Store the Supabase storage path (private bucket — not a public URL)
+        setPaymentProofUrl(json.path);
         toastSuccess("File Uploaded", "Payment proof uploaded successfully.");
       } else {
-        toastError("Upload Failed", json.error || "Could not upload file.");
+        const errMsg = json.error || "Could not upload file. Please try again.";
+        toastError("Upload Failed", errMsg);
         setPaymentProofUrl(null);
       }
     } catch {

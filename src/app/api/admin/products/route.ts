@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { isValidImageUrl } from "@/lib/images";
 
 export async function GET() {
   try {
@@ -41,11 +43,23 @@ export async function DELETE(req: Request) {
 
     await prisma.product.delete({ where: { id } });
 
+    revalidatePath("/", "layout");
+    revalidatePath("/products");
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/admin/products error:", error);
     return NextResponse.json({ error: "Failed to delete product" }, { status: 500 });
   }
+}
+
+function parseBoolean(val: unknown, fallback = false): boolean {
+  if (typeof val === "boolean") return val;
+  if (typeof val === "string") {
+    if (val.toLowerCase() === "true") return true;
+    if (val.toLowerCase() === "false") return false;
+  }
+  return fallback;
 }
 
 export async function POST(req: Request) {
@@ -56,7 +70,25 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { name, slug, description, price, categorySlug, stock, imageUrl, images } = body;
+    const {
+      name,
+      slug,
+      description,
+      price,
+      comparePrice,
+      badge,
+      categorySlug,
+      stock,
+      imageUrl,
+      images,
+      isBestSeller,
+      isNewArrival,
+      isFlashSale,
+    } = body;
+
+    if (!name || !price) {
+      return NextResponse.json({ error: "Product name and price are required" }, { status: 400 });
+    }
 
     // Find category or default
     let category = await prisma.category.findFirst({
@@ -72,51 +104,38 @@ export async function POST(req: Request) {
       });
     }
 
-    // Build images payload — prefer the new `images` array; fall back to legacy `imageUrl`
-    type ImageInput = { url: string; isPrimary?: boolean };
+    type ImageInput = { url: string; isPrimary?: boolean; alt?: string };
     let imageCreatePayload: ImageInput[] | undefined;
 
-    const isValidImageUrl = (urlStr: string): boolean => {
-      if (!urlStr || typeof urlStr !== "string") return false;
-      const trimmed = urlStr.trim();
-      if (
-        trimmed.startsWith("javascript:") ||
-        trimmed.startsWith("data:") ||
-        trimmed.startsWith("file:")
-      ) {
-        return false;
-      }
-      try {
-        const parsed = new URL(trimmed);
-        return parsed.protocol === "http:" || parsed.protocol === "https:";
-      } catch {
-        return false;
-      }
-    };
-
     if (Array.isArray(images) && images.length > 0) {
-      // Validate each entry has a valid HTTP/HTTPS URL
       const valid = (images as ImageInput[]).filter(
-        (img) => img && isValidImageUrl(img.url)
+        (img) => img && img.url && isValidImageUrl(img.url)
       );
       if (valid.length > 0) {
-        // Ensure exactly one primary; if none marked, make first primary
         const hasPrimary = valid.some((img) => img.isPrimary);
         imageCreatePayload = valid.map((img, idx) => ({
           url: img.url.trim(),
           isPrimary: hasPrimary ? Boolean(img.isPrimary) : idx === 0,
+          alt: img.alt || name,
         }));
       }
-    } else if (isValidImageUrl(imageUrl)) {
-      imageCreatePayload = [{ url: imageUrl.trim(), isPrimary: true }];
+    } else if (imageUrl && isValidImageUrl(imageUrl)) {
+      imageCreatePayload = [{ url: imageUrl.trim(), isPrimary: true, alt: name }];
     }
+
+    const generatedSlug = slug ? slug.trim() : name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
     const product = await prisma.product.create({
       data: {
-        name,
-        slug: slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        description: description || name,
-        price: parseFloat(price),
+        name: name.trim(),
+        slug: generatedSlug,
+        description: description ? description.trim() : name.trim(),
+        price: parseFloat(String(price)),
+        comparePrice: comparePrice ? parseFloat(String(comparePrice)) : null,
+        badge: badge ? badge.trim() : null,
+        isBestSeller: parseBoolean(isBestSeller, false),
+        isNewArrival: parseBoolean(isNewArrival, false),
+        isFlashSale:  parseBoolean(isFlashSale, false),
         categoryId: category.id,
         images: imageCreatePayload
           ? { create: imageCreatePayload }
@@ -124,9 +143,9 @@ export async function POST(req: Request) {
         variants: {
           create: [
             {
-              sku: `${slug || "item"}-${Date.now()}`,
-              stock: parseInt(stock || "50", 10),
-              price: parseFloat(price),
+              sku: `${generatedSlug}-${Date.now()}`,
+              stock: stock !== undefined ? parseInt(String(stock), 10) : 50,
+              price: parseFloat(String(price)),
             },
           ],
         },
@@ -137,6 +156,9 @@ export async function POST(req: Request) {
         variants: true,
       },
     });
+
+    revalidatePath("/", "layout");
+    revalidatePath("/products");
 
     return NextResponse.json(product, { status: 201 });
   } catch (error) {
@@ -162,9 +184,9 @@ export async function PATCH(req: Request) {
     const updatedProduct = await prisma.product.update({
       where: { id },
       data: {
-        isBestSeller: typeof isBestSeller === "boolean" ? isBestSeller : undefined,
-        isNewArrival: typeof isNewArrival === "boolean" ? isNewArrival : undefined,
-        isFlashSale: typeof isFlashSale === "boolean" ? isFlashSale : undefined,
+        isBestSeller: isBestSeller !== undefined ? parseBoolean(isBestSeller, false) : undefined,
+        isNewArrival: isNewArrival !== undefined ? parseBoolean(isNewArrival, false) : undefined,
+        isFlashSale:  isFlashSale !== undefined ? parseBoolean(isFlashSale, false) : undefined,
       },
       include: {
         category: true,
@@ -173,10 +195,12 @@ export async function PATCH(req: Request) {
       },
     });
 
+    revalidatePath("/", "layout");
+    revalidatePath("/products");
+
     return NextResponse.json(updatedProduct);
   } catch (error) {
     console.error("PATCH /api/admin/products error:", error);
     return NextResponse.json({ error: "Failed to update product visibility" }, { status: 500 });
   }
 }
-

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma, PaymentMethod } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
-import { resend } from "@/lib/resend";
+import { sendOrderConfirmationEmail } from "@/lib/resend";
 import { formatCurrency } from "@/lib/currency";
 import { resolveProductPricing } from "@/lib/pricing";
 
@@ -29,7 +29,9 @@ const createOrderSchema = z
     items: z.array(orderItemSchema).min(1, "Cart cannot be empty"),
     shippingAddress: addressSchema,
     paymentMethod: z.enum(["BANK_TRANSFER", "CREDIT_CARD", "PAYPAL", "COD"]),
-    paymentProofUrl: z.string().url().optional(),
+    // Storage path returned by /api/upload (e.g. "userId/filename.jpg").
+    // Not validated as a URL because the private bucket path is not a public URL.
+    paymentProofUrl: z.string().min(1).optional(),
     couponCode: z.string().optional(),
     guestEmail: z.string().email().optional(),
     notes: z.string().optional(),
@@ -323,35 +325,20 @@ export async function POST(req: Request) {
     // -------------------------------------------------------------
     // STAGE 3: ASYNCHRONOUS POST-PROCESSING (EMAIL CONFIRMATION)
     // -------------------------------------------------------------
-    if (email && process.env.RESEND_API_KEY) {
-      try {
-        await resend?.emails.send({
-          from: process.env.EMAIL_FROM || "LUXORA <orders@luxora.com>",
-          to: email,
-          subject: `Order Confirmation #${order.orderNumber} - LUXORA`,
-          html: `
-            <div style="font-family: serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #eee; border-radius: 16px;">
-              <h1 style="color: #111; text-align: center;">LUXORA</h1>
-              <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-              <h2 style="color: #222;">Thank you for your order!</h2>
-              <p>Order Number: <strong>${order.orderNumber}</strong></p>
-              <p>Bank Reference: <strong>${order.bankReference}</strong></p>
-              <p>Total Amount: <strong>${formatCurrency(order.total)}</strong></p>
-              <h3 style="margin-top: 24px;">Items Ordered:</h3>
-              <ul>
-                ${order.items
-              .map(
-                (i) => `<li>${i.product.name} x ${i.quantity} - ${formatCurrency(i.totalPrice)}</li>`
-              )
-              .join("")}
-              </ul>
-              <p style="margin-top: 24px; color: #666; font-size: 13px;">If you paid via Direct Bank Transfer, please retain reference <strong>${order.bankReference}</strong> for verification.</p>
-            </div>
-          `,
-        });
-      } catch (emailErr) {
+    if (email) {
+      sendOrderConfirmationEmail({
+        to: email,
+        orderNumber: order.orderNumber,
+        bankReference: order.bankReference,
+        totalAmount: order.total,
+        items: order.items.map((i) => ({
+          name: i.product.name,
+          quantity: i.quantity,
+          price: i.totalPrice,
+        })),
+      }).catch((emailErr) => {
         console.error("Failed to send order email:", emailErr);
-      }
+      });
     }
 
     return NextResponse.json(order, { status: 201 });

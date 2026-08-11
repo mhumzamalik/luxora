@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api-client";
 import { useWishlistStore } from "@/store/wishlist-store";
 import { formatCurrency } from "@/lib/currency";
+import { getPrimaryImage } from "@/lib/images";
 
 interface ProductItem {
   id: string;
@@ -104,7 +105,7 @@ export function NewArrivalsCarousel() {
         >
           {newArrivals.map((product) => {
             const isWishlisted = wishlistStore.isInWishlist(product.id);
-            const primaryImg = product.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=500&q=80";
+            const primaryImg = getPrimaryImage(product);
 
             return (
               <div

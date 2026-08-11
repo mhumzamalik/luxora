@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/components/ui/ToastProvider";
+import { getPrimaryImage } from "@/lib/images";
 
 interface ProductCatalogItem {
   id: string;
@@ -334,7 +335,7 @@ export default function AdminFlashSalesPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                         {sale.items.map((item) => {
                           const prod = item.product;
-                          const primaryImg = prod?.images?.[0]?.url || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=300&q=80";
+                          const primaryImg = getPrimaryImage(prod);
                           const originalPrice = prod?.price || item.salePrice * 1.2;
                           const discountPercent = Math.round(((originalPrice - item.salePrice) / originalPrice) * 100);
 
@@ -456,7 +457,7 @@ export default function AdminFlashSalesPage() {
                   <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
                     {selectedItems.map((item) => {
                       const prod = item.product;
-                      const primaryImg = prod?.images?.[0]?.url || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=300&q=80";
+                      const primaryImg = getPrimaryImage(prod);
 
                       return (
                         <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-200/80">
@@ -571,7 +572,7 @@ export default function AdminFlashSalesPage() {
                   const isSelected = tempSelectedProducts[prod.id] !== undefined;
                   const currentSalePrice = tempSelectedProducts[prod.id] ?? Math.round(prod.price * 0.8 * 100) / 100;
                   const totalStock = prod.variants?.reduce((sum, v) => sum + v.stock, 0) ?? 0;
-                  const primaryImg = prod.images?.[0]?.url || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=300&q=80";
+                  const primaryImg = getPrimaryImage(prod);
 
                   return (
                     <div

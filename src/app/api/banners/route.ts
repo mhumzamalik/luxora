@@ -18,7 +18,7 @@ export async function GET(req: Request) {
       whereClause.type = type;
     }
 
-    const banners = await (prisma as any).banner.findMany({
+    const banners = await prisma.banner.findMany({
       where: whereClause,
       orderBy: [
         { position: "asc" },

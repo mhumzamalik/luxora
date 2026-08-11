@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { supabase } from "@/lib/supabase";
+import { getAdminSupabaseClient } from "@/lib/supabase-admin";
 
 export async function POST(req: Request) {
   try {
@@ -17,38 +17,55 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Convert file to ArrayBuffer / Buffer
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const fileExt = file.name.split(".").pop() || "jpg";
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-    const filePath = `${session.user.id}/${fileName}`;
-
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .upload(filePath, buffer, {
-          contentType: file.type,
-          upsert: true,
-        });
-
-      if (error) {
-        console.error("Supabase storage error:", error);
-      } else {
-        const { data: publicUrlData } = supabase.storage
-          .from(bucket)
-          .getPublicUrl(data.path);
-        return NextResponse.json({ url: publicUrlData.publicUrl });
-      }
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json(
+        { error: "Invalid file type. Allowed: JPEG, PNG, WebP, GIF, PDF." },
+        { status: 400 }
+      );
     }
 
-    // Fallback if Supabase storage credentials are not provided or error occurred
-    const base64 = buffer.toString("base64");
-    const mimeType = file.type || "image/jpeg";
-    const dataUrl = `data:${mimeType};base64,${base64}`;
+    // Validate file size (10 MB max)
+    const MAX_BYTES = 10 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      return NextResponse.json(
+        { error: "File too large. Maximum size is 10 MB." },
+        { status: 400 }
+      );
+    }
 
-    return NextResponse.json({ url: dataUrl });
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    // Store under the authenticated user's folder so paths are scoped
+    const storagePath = `${session.user.id}/${fileName}`;
+
+    // Use the service-role client — bypasses Storage RLS on the private bucket
+    const adminClient = getAdminSupabaseClient();
+
+    const { data, error } = await adminClient.storage
+      .from(bucket)
+      .upload(storagePath, buffer, {
+        contentType: file.type,
+        upsert: true,
+      });
+
+    if (error) {
+      console.error("Supabase storage upload error:", error);
+      return NextResponse.json(
+        { error: `Storage upload failed: ${error.message}` },
+        { status: 500 }
+      );
+    }
+
+    // Return the storage path (not a public URL — the bucket is private).
+    // Signed URLs for display are generated server-side on demand via /api/admin/proof-url.
+    return NextResponse.json({ path: data.path });
   } catch (error) {
     console.error("Upload handler error:", error);
-    return NextResponse.json({ error: "File upload failed" }, { status: 500 });
+    const message =
+      error instanceof Error ? error.message : "File upload failed";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

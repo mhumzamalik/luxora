@@ -29,7 +29,7 @@ export async function PATCH(
       endDate,
     } = body;
 
-    const existingBanner = await (prisma as any).banner.findUnique({ where: { id } });
+    const existingBanner = await prisma.banner.findUnique({ where: { id } });
     if (!existingBanner) {
       return NextResponse.json({ error: "Banner not found" }, { status: 404 });
     }
@@ -49,7 +49,7 @@ export async function PATCH(
     if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null;
     if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
 
-    const updatedBanner = await (prisma as any).banner.update({
+    const updatedBanner = await prisma.banner.update({
       where: { id },
       data: updateData,
     });
@@ -72,7 +72,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    await (prisma as any).banner.delete({ where: { id } });
+    await prisma.banner.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

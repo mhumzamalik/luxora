@@ -56,6 +56,7 @@ export async function GET(req: Request) {
     }
 
     const now = new Date();
+
     const total = await prisma.product.count({ where });
     const rawProducts = await prisma.product.findMany({
       where,

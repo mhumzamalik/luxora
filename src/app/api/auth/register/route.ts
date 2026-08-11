@@ -40,38 +40,66 @@ export async function POST(req: Request) {
       where: { email: normalizedEmail },
     });
 
+    let user;
+
     if (existingUser) {
-      return NextResponse.json(
-        { error: "An account with this email already exists" },
-        { status: 400 }
-      );
+      if (existingUser.emailVerified !== null) {
+        return NextResponse.json(
+          { error: "An account with this email already exists" },
+          { status: 400 }
+        );
+      }
+      // Unverified existing user: update credentials and resend verification email
+      const passwordHash = await bcrypt.hash(password, 10);
+      user = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: { name, passwordHash },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          createdAt: true,
+        },
+      });
+    } else {
+      const passwordHash = await bcrypt.hash(password, 10);
+      user = await prisma.user.create({
+        data: {
+          name,
+          email: normalizedEmail,
+          passwordHash,
+          role: "CUSTOMER",
+          emailVerified: null,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          createdAt: true,
+        },
+      });
     }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email: normalizedEmail,
-        passwordHash,
-        role: "CUSTOMER",
-        emailVerified: null,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true,
-      },
-    });
 
     // Generate secure verification token & send email
     const { rawToken } = await generateVerificationToken(normalizedEmail);
-    await sendVerificationEmail({
+    const emailResult = await sendVerificationEmail({
       to: normalizedEmail,
       token: rawToken,
     });
+
+    if (!emailResult.success) {
+      const errorDetail =
+        emailResult.error?.message ||
+        (typeof emailResult.error === "string" ? emailResult.error : "Email delivery failed");
+      return NextResponse.json(
+        {
+          error: `Account saved, but verification email could not be sent: ${errorDetail}`,
+        },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(
       {

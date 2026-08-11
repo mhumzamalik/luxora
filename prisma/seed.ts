@@ -38,7 +38,7 @@ async function main() {
   const categoriesData = [
     { name: "Women", slug: "women", imageUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80" },
     { name: "Men", slug: "men", imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80" },
-    { name: "Shoes", slug: "shoes", imageUrl: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=400&q=80" },
+    { name: "Kids", slug: "kids", imageUrl: "https://images.unsplash.com/photo-1514090458221-65bb69cf63e6?auto=format&fit=crop&w=400&q=80" },
     { name: "Bags", slug: "bags", imageUrl: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=400&q=80" },
     { name: "Accessories", slug: "accessories", imageUrl: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?auto=format&fit=crop&w=400&q=80" },
     { name: "Beauty", slug: "beauty", imageUrl: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=400&q=80" },
@@ -109,7 +109,7 @@ async function main() {
       rating: 4.7,
       reviewCount: 652,
       isBestSeller: true,
-      categorySlug: "shoes",
+      categorySlug: "kids",
       imageUrl: "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=800&q=80",
     },
 
@@ -191,7 +191,7 @@ async function main() {
       rating: 4.9,
       reviewCount: 890,
       isNewArrival: true,
-      categorySlug: "shoes",
+      categorySlug: "kids",
       imageUrl: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?auto=format&fit=crop&w=800&q=80",
     },
     {

@@ -57,7 +57,7 @@ export function Header() {
     { name: "New In", href: "/products?isNewArrival=true" },
     { name: "Women", href: "/products?category=women" },
     { name: "Men", href: "/products?category=men" },
-    { name: "Shoes", href: "/products?category=shoes" },
+    { name: "Kids", href: "/products?category=kids" },
     { name: "Bags", href: "/products?category=bags" },
     { name: "Accessories", href: "/products?category=accessories" },
     { name: "Beauty", href: "/products?category=beauty" },
@@ -88,13 +88,14 @@ export function Header() {
               <span>PKR</span>
               <ChevronDown size={12} />
             </div>
-            <div
-              className="flex items-center gap-1 text-gray-400 cursor-not-allowed opacity-60 select-none"
-              title="Coming Soon"
+            <Link
+              href="/track-order"
+              className="flex items-center gap-1 text-gray-700 hover:text-blue-600 transition-colors"
+              title="Track Order"
             >
               <Truck size={13} />
               <span>Track Order</span>
-            </div>
+            </Link>
             <Link
               href="/help"
               className="hidden sm:flex items-center gap-1 hover:text-black"

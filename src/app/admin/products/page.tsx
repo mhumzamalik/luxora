@@ -3,11 +3,12 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Plus, Search, Trash2, Loader2, Sparkles, Zap, Flame } from "lucide-react";
+import { Plus, Search, Trash2, Edit3, Loader2, Sparkles, Zap, Flame } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/components/ui/ToastProvider";
+import { getPrimaryImage } from "@/lib/images";
 
 interface AdminProduct {
   id: string;
@@ -18,7 +19,7 @@ interface AdminProduct {
   isNewArrival?: boolean;
   isFlashSale?: boolean;
   category?: { name: string };
-  images?: { url: string }[];
+  images?: { url: string; isPrimary?: boolean }[];
   variants?: { stock: number }[];
 }
 
@@ -83,7 +84,7 @@ export default function AdminProductsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-gray-200/70 shadow-2xs">
         <div>
           <h1 className="text-2xl font-serif font-bold text-gray-900">
-            Product & Catalog Management
+            Product &amp; Catalog Management
           </h1>
           <p className="text-xs text-gray-500 mt-1">
             Manage catalog items, stock levels, and control homepage section visibility.
@@ -145,14 +146,14 @@ export default function AdminProductsPage() {
             <tbody className="divide-y divide-gray-100 font-medium">
               {filteredProducts.map((prod) => {
                 const totalStock = prod.variants?.reduce((sum, v) => sum + v.stock, 0) ?? 0;
-                const primaryImg = prod.images?.[0]?.url || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=300&q=80";
+                const primaryImg = getPrimaryImage(prod);
 
                 return (
                   <tr key={prod.id} className="hover:bg-gray-50/60 transition">
                     <td className="p-4">
                       <div className="flex items-center space-x-3">
                         <div className="relative w-10 h-10 bg-gray-50 border border-gray-100 rounded-xl overflow-hidden shrink-0">
-                          <Image src={primaryImg} alt={prod.name} fill className="object-contain p-1" />
+                          <Image src={primaryImg} alt={prod.name} fill className="object-contain p-1" sizes="40px" />
                         </div>
                         <span className="font-bold text-gray-900 line-clamp-1">{prod.name}</span>
                       </div>
@@ -222,14 +223,23 @@ export default function AdminProductsPage() {
                       </div>
                     </td>
                     <td className="p-4 text-center">
-                      <button
-                        onClick={() => handleDelete(prod.id)}
-                        disabled={deleteMutation.isPending}
-                        className="p-2 rounded-xl text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                        title="Delete Product"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <Link
+                          href={`/admin/products/${prod.id}`}
+                          className="p-2 rounded-xl text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition"
+                          title="Edit Product"
+                        >
+                          <Edit3 size={16} />
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(prod.id)}
+                          disabled={deleteMutation.isPending}
+                          className="p-2 rounded-xl text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                          title="Delete Product"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

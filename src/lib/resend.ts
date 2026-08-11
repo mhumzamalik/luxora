@@ -2,8 +2,28 @@ import { Resend } from "resend";
 import { Logger } from "./logger";
 import { formatCurrency } from "./currency";
 
-const resendApiKey = process.env.RESEND_API_KEY;
-export const resend = resendApiKey ? new Resend(resendApiKey) : null;
+/**
+ * Returns Resend client instance and sender email address.
+ * Validates RESEND_API_KEY and RESEND_EMAIL_FROM environment variables.
+ */
+function getResendConfig() {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_EMAIL_FROM || process.env.EMAIL_FROM;
+
+  if (!apiKey || !from) {
+    const missing: string[] = [];
+    if (!apiKey) missing.push("RESEND_API_KEY");
+    if (!from) missing.push("RESEND_EMAIL_FROM");
+    const error = {
+      message: `Missing required environment variable(s): ${missing.join(", ")}`,
+    };
+    Logger.error(`[Resend] Email failed: ${error.message}`);
+    return { client: null, from: null, error };
+  }
+
+  const client = new Resend(apiKey);
+  return { client, from, error: null };
+}
 
 export async function sendOrderConfirmationEmail(params: {
   to: string;
@@ -11,19 +31,15 @@ export async function sendOrderConfirmationEmail(params: {
   bankReference: string;
   totalAmount: number;
   items: Array<{ name: string; quantity: number; price: number }>;
-}) {
-  if (!resend) {
-    Logger.warn("Resend API key missing. Email sending skipped in dev mode.", {
-      to: params.to,
-      orderNumber: params.orderNumber,
-    });
-    return { success: false, reason: "resend_not_configured" };
+}): Promise<{ success: boolean; id?: string; error?: any }> {
+  const config = getResendConfig();
+  if (config.error || !config.client || !config.from) {
+    return { success: false, error: config.error };
   }
 
   try {
-    const from = process.env.EMAIL_FROM || "LUXORA <orders@luxora-store.com>";
-    const response = await resend.emails.send({
-      from,
+    const response = await config.client.emails.send({
+      from: config.from,
       to: params.to,
       subject: `Order Confirmed - #${params.orderNumber} | LUXORA`,
       html: `
@@ -44,10 +60,19 @@ export async function sendOrderConfirmationEmail(params: {
         </div>
       `,
     });
-    Logger.info("Order confirmation email sent", { orderNumber: params.orderNumber, id: response.data?.id });
-    return { success: true, id: response.data?.id };
+
+    if (response.error) {
+      const errorMsg = JSON.stringify(response.error);
+      Logger.error(`[Resend] Email failed: ${errorMsg}`, { orderNumber: params.orderNumber });
+      return { success: false, error: response.error };
+    }
+
+    const emailId = response.data?.id;
+    Logger.info(`[Resend] Email sent successfully: ${emailId}`, { orderNumber: params.orderNumber });
+    return { success: true, id: emailId };
   } catch (err) {
-    Logger.error("Failed to send order confirmation email", err, { orderNumber: params.orderNumber });
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    Logger.error(`[Resend] Email failed: ${errorMsg}`, err, { orderNumber: params.orderNumber });
     return { success: false, error: err };
   }
 }
@@ -55,26 +80,21 @@ export async function sendOrderConfirmationEmail(params: {
 export async function sendVerificationEmail(params: {
   to: string;
   token: string;
-}) {
+}): Promise<{ success: boolean; id?: string; error?: any; link?: string }> {
   const domain =
     process.env.NEXTAUTH_URL ||
     process.env.NEXT_PUBLIC_STORE_URL ||
     "http://localhost:3000";
   const confirmLink = `${domain}/auth/verify-email?token=${params.token}&email=${encodeURIComponent(params.to)}`;
 
-  if (!resend) {
-    Logger.warn(
-      "Resend API key missing. Email verification link generated (dev mode):",
-      { to: params.to, link: confirmLink }
-    );
-    console.log(`\n========================================\n[DEV VERIFICATION LINK] (${params.to}):\n${confirmLink}\n========================================\n`);
-    return { success: false, reason: "resend_not_configured", link: confirmLink };
+  const config = getResendConfig();
+  if (config.error || !config.client || !config.from) {
+    return { success: false, error: config.error };
   }
 
   try {
-    const from = process.env.EMAIL_FROM || "LUXORA <auth@luxora-store.com>";
-    const response = await resend.emails.send({
-      from,
+    const response = await config.client.emails.send({
+      from: config.from,
       to: params.to,
       subject: "Verify Your Email Address | LUXORA",
       html: `
@@ -111,11 +131,67 @@ export async function sendVerificationEmail(params: {
         </div>
       `,
     });
-    Logger.info("Verification email sent", { to: params.to, id: response.data?.id });
-    return { success: true, id: response.data?.id };
+
+    if (response.error) {
+      const errorMsg = JSON.stringify(response.error);
+      Logger.error(`[Resend] Email failed: ${errorMsg}`, { to: params.to });
+      return { success: false, error: response.error };
+    }
+
+    const emailId = response.data?.id;
+    Logger.info(`[Resend] Email sent successfully: ${emailId}`, { to: params.to });
+    return { success: true, id: emailId };
   } catch (err) {
-    Logger.error("Failed to send verification email", err, { to: params.to });
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    Logger.error(`[Resend] Email failed: ${errorMsg}`, err, { to: params.to });
     return { success: false, error: err };
   }
 }
+
+export async function sendPasswordResetEmail(params: {
+  to: string;
+  token: string;
+}): Promise<{ success: boolean; id?: string; error?: any }> {
+  const domain =
+    process.env.NEXTAUTH_URL ||
+    process.env.NEXT_PUBLIC_STORE_URL ||
+    "http://localhost:3000";
+  const resetLink = `${domain}/auth/reset-password?token=${params.token}&email=${encodeURIComponent(params.to)}`;
+
+  const config = getResendConfig();
+  if (config.error || !config.client || !config.from) {
+    return { success: false, error: config.error };
+  }
+
+  try {
+    const response = await config.client.emails.send({
+      from: config.from,
+      to: params.to,
+      subject: "Reset your LUXORA Password",
+      html: `
+        <div style="font-family: serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 12px;">
+          <h2 style="color: #111;">LUXORA Password Reset</h2>
+          <p>You requested a password reset for your account.</p>
+          <p><a href="${resetLink}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Reset Password</a></p>
+          <p style="color: #666; font-size: 12px;">This link expires in 1 hour. If you did not request this, please ignore this email.</p>
+        </div>
+      `,
+    });
+
+    if (response.error) {
+      const errorMsg = JSON.stringify(response.error);
+      Logger.error(`[Resend] Email failed: ${errorMsg}`, { to: params.to });
+      return { success: false, error: response.error };
+    }
+
+    const emailId = response.data?.id;
+    Logger.info(`[Resend] Email sent successfully: ${emailId}`, { to: params.to });
+    return { success: true, id: emailId };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    Logger.error(`[Resend] Email failed: ${errorMsg}`, err, { to: params.to });
+    return { success: false, error: err };
+  }
+}
+
 

@@ -1,13 +1,50 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getPrimaryImage } from "@/lib/images";
 
 export async function GET() {
   try {
     const now = new Date();
 
-    // 1. Fetch Best Sellers
-    let bestSellers = await prisma.product.findMany({
-      where: { isBestSeller: true },
+    // ─────────────────────────────────────────────────────────────────────────
+    // STEP 0: Determine which product IDs are in an ACTIVE Flash Sale.
+    //
+    // "Active" means the FlashSale row satisfies ALL of:
+    //   isActive = true
+    //   startDate <= now
+    //   endDate   >= now
+    //
+    // These IDs are used to EXCLUDE products from Best Sellers and New Arrivals
+    // so the same product never appears in more than one homepage section.
+    // ─────────────────────────────────────────────────────────────────────────
+    const activeFlashSaleItems = await prisma.flashSaleItem.findMany({
+      where: {
+        flashSale: {
+          isActive: true,
+          startDate: { lte: now },
+          endDate:   { gte: now },
+        },
+      },
+      select: { productId: true },
+    });
+
+    // Set of product IDs that belong to an active Flash Sale (O(1) lookup)
+    const activeFlashSaleProductIds = new Set(
+      activeFlashSaleItems.map((item) => item.productId)
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 1. Best Sellers
+    //    Strictly filter by isBestSeller = true.
+    //    Exclude any product that is currently in an active Flash Sale.
+    // ─────────────────────────────────────────────────────────────────────────
+    const bestSellers = await prisma.product.findMany({
+      where: {
+        isBestSeller: true,
+        ...(activeFlashSaleProductIds.size > 0 && {
+          id: { notIn: [...activeFlashSaleProductIds] },
+        }),
+      },
       take: 8,
       include: {
         category: true,
@@ -17,25 +54,18 @@ export async function GET() {
       orderBy: { updatedAt: "desc" },
     });
 
-    if (bestSellers.length === 0) {
-      bestSellers = await prisma.product.findMany({
-        take: 8,
-        include: {
-          category: true,
-          images: true,
-          variants: true,
-        },
-        orderBy: { reviewCount: "desc" },
-      });
-    }
-
-    // 2. Fetch Active Flash Sale
-    // Find active flash sale currently within time window, or fallback to latest active sale
-    let activeFlashSale = await prisma.flashSale.findFirst({
+    // ─────────────────────────────────────────────────────────────────────────
+    // 2. Active Flash Sale
+    //    Source of truth: FlashSaleItem.salePrice (never Product.price).
+    //    "Active" = isActive AND startDate <= now AND endDate >= now.
+    //    No fallback to isFlashSale flag — if no real campaign exists,
+    //    the Flash Sale section simply does not render.
+    // ─────────────────────────────────────────────────────────────────────────
+    const activeFlashSale = await prisma.flashSale.findFirst({
       where: {
         isActive: true,
         startDate: { lte: now },
-        endDate: { gte: now },
+        endDate:   { gte: now },
       },
       include: {
         items: {
@@ -50,113 +80,84 @@ export async function GET() {
           },
         },
       },
-      orderBy: { endDate: "asc" },
+      orderBy: { endDate: "asc" }, // soonest-ending first
     });
 
-    // Fallback: If no current active flash sale in window, find latest active flash sale
-    if (!activeFlashSale) {
-      activeFlashSale = await prisma.flashSale.findFirst({
-        where: { isActive: true },
-        include: {
-          items: {
-            include: {
-              product: {
-                include: {
-                  category: true,
-                  images: true,
-                  variants: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      });
-    }
+    let flashSaleData: {
+      id: string;
+      title: string;
+      startDate: string;
+      endDate: string;
+      isActive: boolean;
+      products: {
+        id: string;
+        name: string;
+        slug: string;
+        /** Sale price from FlashSaleItem.salePrice — NOT Product.price */
+        price: number;
+        /** Original price from Product.price, shown crossed-out */
+        comparePrice: number;
+        badge: string;
+        image: string;
+        images: { id: string; url: string; alt?: string | null; isPrimary: boolean }[];
+        stock: number;
+        category: string;
+        rating: number;
+        reviewCount: number;
+      }[];
+    } | null = null;
 
-    // Fallback if no FlashSale record exists yet: find products marked isFlashSale: true
-    let flashSaleData = null;
     if (activeFlashSale) {
       flashSaleData = {
-        id: activeFlashSale.id,
-        title: activeFlashSale.title,
+        id:        activeFlashSale.id,
+        title:     activeFlashSale.title,
         startDate: activeFlashSale.startDate.toISOString(),
-        endDate: activeFlashSale.endDate.toISOString(),
-        isActive: activeFlashSale.isActive,
+        endDate:   activeFlashSale.endDate.toISOString(),
+        isActive:  activeFlashSale.isActive,
         products: activeFlashSale.items.map((item) => {
           const prod = item.product;
-          const originalPrice = prod.price;
-          const salePrice = item.salePrice;
-          const discountPercent = originalPrice > salePrice
-            ? Math.round(((originalPrice - salePrice) / originalPrice) * 100)
-            : 0;
+          // salePrice  → the price the customer pays during the Flash Sale
+          // originalPrice → the regular Product.price, shown crossed-out
+          const salePrice      = Number(item.salePrice);
+          const originalPrice  = Number(prod.price);
+          const discountPercent =
+            originalPrice > salePrice
+              ? Math.round(((originalPrice - salePrice) / originalPrice) * 100)
+              : 0;
 
           const totalStock = prod.variants?.reduce((sum, v) => sum + v.stock, 0) ?? 0;
-          const primaryImage = prod.images?.find((img) => img.isPrimary)?.url || prod.images?.[0]?.url || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=500&q=80";
+          const primaryImage = getPrimaryImage(prod);
 
           return {
-            id: prod.id,
-            name: prod.name,
-            slug: prod.slug,
-            price: salePrice,
-            comparePrice: originalPrice,
-            badge: discountPercent > 0 ? `-${discountPercent}%` : prod.badge || "-20%",
-            image: primaryImage,
-            stock: totalStock,
-            category: prod.category?.name || "General",
-            rating: prod.rating,
-            reviewCount: prod.reviewCount,
-          };
-        }),
-      };
-    } else {
-      // Fallback to legacy isFlashSale products if no campaign was created yet
-      const fallbackProducts = await prisma.product.findMany({
-        where: { isFlashSale: true },
-        take: 4,
-        include: {
-          category: true,
-          images: true,
-          variants: true,
-        },
-      });
-
-      // 2 hours from now default
-      const defaultEndDate = new Date(Date.now() + 2 * 60 * 60 * 1000 + 18 * 60 * 1000 + 34 * 1000);
-
-      flashSaleData = {
-        id: "default-flash-sale",
-        title: "Flash Sale",
-        startDate: new Date().toISOString(),
-        endDate: defaultEndDate.toISOString(),
-        isActive: true,
-        products: fallbackProducts.map((prod) => {
-          const originalPrice = prod.comparePrice || prod.price * 1.25;
-          const salePrice = prod.price;
-          const discountPercent = Math.round(((originalPrice - salePrice) / originalPrice) * 100);
-          const totalStock = prod.variants?.reduce((sum, v) => sum + v.stock, 0) ?? 0;
-          const primaryImage = prod.images?.find((img) => img.isPrimary)?.url || prod.images?.[0]?.url || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=500&q=80";
-
-          return {
-            id: prod.id,
-            name: prod.name,
-            slug: prod.slug,
-            price: salePrice,
-            comparePrice: originalPrice,
-            badge: prod.badge || `-${discountPercent}%`,
-            image: primaryImage,
-            stock: totalStock,
-            category: prod.category?.name || "General",
-            rating: prod.rating,
-            reviewCount: prod.reviewCount,
+            id:           prod.id,
+            name:         prod.name,
+            slug:         prod.slug,
+            price:        salePrice,        // sale price — what the customer sees
+            comparePrice: originalPrice,    // original price — crossed-out
+            badge:        discountPercent > 0 ? `-${discountPercent}%` : (prod.badge ?? "-20%"),
+            image:        primaryImage,
+            images:       prod.images,
+            stock:        totalStock,
+            category:     prod.category?.name ?? "General",
+            rating:       prod.rating,
+            reviewCount:  prod.reviewCount,
           };
         }),
       };
     }
 
-    // 3. Fetch New Arrivals
-    let newArrivals = await prisma.product.findMany({
-      where: { isNewArrival: true },
+    // ─────────────────────────────────────────────────────────────────────────
+    // 3. New Arrivals
+    //    Strictly filter by isNewArrival = true.
+    //    Exclude any product that is currently in an active Flash Sale.
+    // ─────────────────────────────────────────────────────────────────────────
+    const newArrivals = await prisma.product.findMany({
+      where: {
+        isNewArrival: true,
+        ...(activeFlashSaleProductIds.size > 0 && {
+          id: { notIn: [...activeFlashSaleProductIds] },
+        }),
+      },
       take: 8,
       include: {
         category: true,
@@ -166,19 +167,9 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    if (newArrivals.length === 0) {
-      newArrivals = await prisma.product.findMany({
-        take: 8,
-        include: {
-          category: true,
-          images: true,
-          variants: true,
-        },
-        orderBy: { createdAt: "desc" },
-      });
-    }
-
-    // 4. Fetch Categories
+    // ─────────────────────────────────────────────────────────────────────────
+    // 4. Categories
+    // ─────────────────────────────────────────────────────────────────────────
     const categories = await prisma.category.findMany({
       take: 12,
       include: {
@@ -188,54 +179,65 @@ export async function GET() {
       },
     });
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Shape and return the response
+    // ─────────────────────────────────────────────────────────────────────────
     return NextResponse.json({
       bestSellers: bestSellers.map((prod) => {
         const totalStock = prod.variants?.reduce((sum, v) => sum + v.stock, 0) ?? 0;
-        const primaryImg = prod.images?.find((i) => i.isPrimary)?.url || prod.images?.[0]?.url || "";
+        const primaryImg = getPrimaryImage(prod);
         return {
-          id: prod.id,
-          name: prod.name,
-          slug: prod.slug,
-          description: prod.description,
-          price: prod.price,
-          comparePrice: prod.comparePrice,
-          badge: prod.badge,
-          rating: prod.rating,
-          reviewCount: prod.reviewCount,
-          category: prod.category?.name || "General",
-          image: primaryImg,
-          stock: totalStock,
+          id:           prod.id,
+          name:         prod.name,
+          slug:         prod.slug,
+          description:  prod.description,
+          price:        Number(prod.price),
+          comparePrice: prod.comparePrice != null ? Number(prod.comparePrice) : null,
+          badge:        prod.badge,
+          rating:       prod.rating,
+          reviewCount:  prod.reviewCount,
+          category:     prod.category?.name ?? "General",
+          image:        primaryImg,
+          images:       prod.images,
+          stock:        totalStock,
         };
       }),
+
       flashSale: flashSaleData,
+
       newArrivals: newArrivals.map((prod) => {
         const totalStock = prod.variants?.reduce((sum, v) => sum + v.stock, 0) ?? 0;
-        const primaryImg = prod.images?.find((i) => i.isPrimary)?.url || prod.images?.[0]?.url || "";
+        const primaryImg = getPrimaryImage(prod);
         return {
-          id: prod.id,
-          name: prod.name,
-          slug: prod.slug,
-          description: prod.description,
-          price: prod.price,
-          comparePrice: prod.comparePrice,
-          badge: prod.badge || "New",
-          rating: prod.rating,
-          reviewCount: prod.reviewCount,
-          category: prod.category?.name || "General",
-          image: primaryImg,
-          stock: totalStock,
+          id:           prod.id,
+          name:         prod.name,
+          slug:         prod.slug,
+          description:  prod.description,
+          price:        Number(prod.price),
+          comparePrice: prod.comparePrice != null ? Number(prod.comparePrice) : null,
+          badge:        prod.badge ?? "New",
+          rating:       prod.rating,
+          reviewCount:  prod.reviewCount,
+          category:     prod.category?.name ?? "General",
+          image:        primaryImg,
+          images:       prod.images,
+          stock:        totalStock,
         };
       }),
+
       categories: categories.map((cat) => ({
-        id: cat.id,
-        name: cat.name,
-        slug: cat.slug,
-        image: cat.imageUrl,
+        id:           cat.id,
+        name:         cat.name,
+        slug:         cat.slug,
+        image:        cat.imageUrl,
         productCount: cat._count.products,
       })),
     });
   } catch (error) {
     console.error("GET /api/homepage error:", error);
-    return NextResponse.json({ error: "Failed to fetch homepage data" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch homepage data" },
+      { status: 500 }
+    );
   }
 }

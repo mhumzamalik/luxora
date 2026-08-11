@@ -9,7 +9,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const banners = await (prisma as any).banner.findMany({
+    const banners = await prisma.banner.findMany({
       orderBy: [
         { position: "asc" },
         { createdAt: "desc" },
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Banner image is required" }, { status: 400 });
     }
 
-    const banner = await (prisma as any).banner.create({
+    const banner = await prisma.banner.create({
       data: {
         title: title.trim(),
         subtitle: subtitle ? subtitle.trim() : null,

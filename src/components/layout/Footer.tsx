@@ -47,7 +47,7 @@ export function Footer() {
             <ul className="space-y-2 text-xs text-gray-400">
               <li><Link href="/products?category=women" className="hover:text-white transition">Women</Link></li>
               <li><Link href="/products?category=men" className="hover:text-white transition">Men</Link></li>
-              <li><Link href="/products?category=shoes" className="hover:text-white transition">Shoes</Link></li>
+              <li><Link href="/products?category=kids" className="hover:text-white transition">Kids</Link></li>
               <li><Link href="/products?category=bags" className="hover:text-white transition">Bags</Link></li>
               <li><Link href="/products?category=accessories" className="hover:text-white transition">Accessories</Link></li>
               <li><Link href="/products?sale=true" className="hover:text-white transition text-red-400">Sale</Link></li>

@@ -46,10 +46,20 @@ export async function POST(req: Request) {
     // Only send email if user exists and is not yet verified
     if (user && !user.emailVerified) {
       const { rawToken } = await generateVerificationToken(normalizedEmail);
-      await sendVerificationEmail({
+      const emailResult = await sendVerificationEmail({
         to: normalizedEmail,
         token: rawToken,
       });
+
+      if (!emailResult.success) {
+        const errorDetail =
+          emailResult.error?.message ||
+          (typeof emailResult.error === "string" ? emailResult.error : "Email delivery failed");
+        return NextResponse.json(
+          { error: `Failed to send verification email: ${errorDetail}` },
+          { status: 500 }
+        );
+      }
     }
 
     // Always return a generic success message to prevent email enumeration

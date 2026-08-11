@@ -11,7 +11,7 @@ const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().optional(),
+  RESEND_EMAIL_FROM: z.string().optional(),
   NEXT_PUBLIC_STORE_NAME: z.string().default("LUXORA"),
   NEXT_PUBLIC_STORE_URL: z.string().default("http://localhost:3000"),
 });
@@ -27,7 +27,7 @@ export const env = envSchema.parse({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   RESEND_API_KEY: process.env.RESEND_API_KEY,
-  EMAIL_FROM: process.env.EMAIL_FROM,
+  RESEND_EMAIL_FROM: process.env.RESEND_EMAIL_FROM || process.env.EMAIL_FROM,
   NEXT_PUBLIC_STORE_NAME: process.env.NEXT_PUBLIC_STORE_NAME,
   NEXT_PUBLIC_STORE_URL: process.env.NEXT_PUBLIC_STORE_URL,
 });

@@ -10,6 +10,7 @@ import { useQuickViewStore, QuickViewProduct } from "@/store/quick-view-store";
 import { formatCurrency } from "@/lib/currency";
 
 import { useToast } from "@/components/ui/ToastProvider";
+import { getPrimaryImage } from "@/lib/images";
 
 export interface ProductCardProps {
   product: {
@@ -39,11 +40,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const quickViewStore = useQuickViewStore();
   const { success: toastSuccess, error: toastError } = useToast();
 
-  const primaryImage =
-    product.images?.find((img) => img.isPrimary)?.url ||
-    product.images?.[0]?.url ||
-    product.image ||
-    "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80";
+  const primaryImage = getPrimaryImage(product);
 
   const isWishlisted = wishlistStore.isInWishlist(product.id);
 

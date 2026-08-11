@@ -142,7 +142,7 @@ function ProductsContent() {
                 Category
               </h3>
               <div className="space-y-1 text-xs">
-                {["all", "women", "men", "shoes", "bags", "accessories", "beauty", "home-living"].map((cat) => (
+                {["all", "women", "men", "kids", "bags", "accessories", "beauty", "home-living"].map((cat) => (
                   <label key={cat} className="flex items-center space-x-2 capitalize cursor-pointer">
                     <input
                       type="radio"

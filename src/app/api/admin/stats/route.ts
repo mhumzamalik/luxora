@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { getPrimaryImage } from "@/lib/images";
 
 export async function GET(request: Request) {
   try {
@@ -169,10 +170,7 @@ export async function GET(request: Request) {
 
     const bestSellers = orderItemsAgg.map((item) => {
       const prod = bestSellerProducts.find((p) => p.id === item.productId);
-      const primaryImage =
-        prod?.images?.find((img) => img.isPrimary)?.url ||
-        prod?.images?.[0]?.url ||
-        "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=300&q=80";
+      const primaryImage = getPrimaryImage(prod);
 
       return {
         id: item.productId,
@@ -185,10 +183,7 @@ export async function GET(request: Request) {
 
     // Format Low Stock Products
     const formattedLowStock = lowStockVariants.map((variant) => {
-      const primaryImage =
-        variant.product.images?.find((img) => img.isPrimary)?.url ||
-        variant.product.images?.[0]?.url ||
-        "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=300&q=80";
+      const primaryImage = getPrimaryImage(variant.product);
 
       return {
         id: variant.id,

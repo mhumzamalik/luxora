@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api-client";
+import { getPrimaryImage } from "@/lib/images";
 
 interface InventoryVariant {
   id: string;
@@ -113,9 +114,7 @@ export default function AdminInventoryPage() {
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
               {variants.map((varItem) => {
-                const primaryImg =
-                  varItem.product.images?.[0]?.url ||
-                  "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=300&q=80";
+                const primaryImg = getPrimaryImage(varItem.product);
 
                 const isEditing = editingId === varItem.id;
 

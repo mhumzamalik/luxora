@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import crypto from "crypto";
-import { resend } from "@/lib/resend";
+import { sendPasswordResetEmail } from "@/lib/resend";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 const forgotSchema = z.object({
@@ -53,22 +53,19 @@ export async function POST(req: Request) {
       },
     });
 
-    const resetLink = `${process.env.NEXT_PUBLIC_STORE_URL || "http://localhost:3000"}/auth/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
+    const emailResult = await sendPasswordResetEmail({
+      to: email,
+      token: resetToken,
+    });
 
-    if (process.env.RESEND_API_KEY) {
-      await resend?.emails.send({
-        from: process.env.EMAIL_FROM || "LUXORA <noreply@luxora.com>",
-        to: email,
-        subject: "Reset your LUXORA Password",
-        html: `
-          <div style="font-family: serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 12px;">
-            <h2 style="color: #111;">LUXORA Password Reset</h2>
-            <p>You requested a password reset for your account.</p>
-            <p><a href="${resetLink}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Reset Password</a></p>
-            <p style="color: #666; font-size: 12px;">This link expires in 1 hour. If you did not request this, please ignore this email.</p>
-          </div>
-        `,
-      });
+    if (!emailResult.success) {
+      const errorDetail =
+        emailResult.error?.message ||
+        (typeof emailResult.error === "string" ? emailResult.error : "Email delivery failed");
+      return NextResponse.json(
+        { error: `Failed to send password reset email: ${errorDetail}` },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({

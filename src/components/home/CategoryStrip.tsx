@@ -14,9 +14,9 @@ const categories = [
     image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80",
   },
   {
-    name: "Shoes",
-    slug: "shoes",
-    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=300&q=80",
+    name: "Kids",
+    slug: "kids",
+    image: "https://images.unsplash.com/photo-1514090458221-65bb69cf63e6?auto=format&fit=crop&w=300&q=80",
   },
   {
     name: "Bags",

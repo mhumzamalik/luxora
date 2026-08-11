@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft,
   Save,
@@ -23,10 +23,8 @@ import {
   Zap,
 } from "lucide-react";
 import { fetchApi } from "@/lib/api-client";
+import { isValidImageUrl } from "@/lib/images";
 
-/* ─────────────────────────────────────────────
-   Types
-───────────────────────────────────────────── */
 interface ProductImageItem {
   key: string;
   url: string;
@@ -39,9 +37,6 @@ const ACCEPTED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const MAX_SIZE_MB = 5;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
-/* ─────────────────────────────────────────────
-   Upload helper — uses existing /api/upload
-───────────────────────────────────────────── */
 async function uploadFile(file: File): Promise<string> {
   const fd = new FormData();
   fd.append("file", file);
@@ -57,45 +52,6 @@ async function uploadFile(file: File): Promise<string> {
   return json.url;
 }
 
-/* ─────────────────────────────────────────────
-   URL Validator helper
-───────────────────────────────────────────── */
-function validateImageUrl(
-  urlStr: string,
-  existingUrls: string[]
-): { valid: boolean; error?: string } {
-  if (!urlStr || !urlStr.trim()) {
-    return { valid: false, error: "Please enter an image URL." };
-  }
-  const trimmed = urlStr.trim();
-  if (
-    trimmed.startsWith("javascript:") ||
-    trimmed.startsWith("data:") ||
-    trimmed.startsWith("file:")
-  ) {
-    return {
-      valid: false,
-      error: "Invalid URL protocol. Only HTTP and HTTPS URLs are allowed.",
-    };
-  }
-  let parsed: URL;
-  try {
-    parsed = new URL(trimmed);
-  } catch {
-    return { valid: false, error: "Malformed URL. Please enter a valid URL." };
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return { valid: false, error: "Only HTTP and HTTPS URLs are allowed." };
-  }
-  if (existingUrls.includes(trimmed)) {
-    return { valid: false, error: "This image URL has already been added." };
-  }
-  return { valid: true };
-}
-
-/* ─────────────────────────────────────────────
-   Image thumbnail card component
-───────────────────────────────────────────── */
 function ImageThumb({
   img,
   onRemove,
@@ -115,25 +71,18 @@ function ImageThumb({
           : "border-gray-200 hover:border-gray-300"
       }`}
     >
-      {/* Primary Badge */}
       {img.isPrimary && (
         <span className="absolute top-2 left-2 bg-purple-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow z-10">
           <Star size={9} className="fill-white" /> Primary
         </span>
       )}
 
-      {/* Source Tag Badge */}
-      <span className="absolute top-2 right-2 bg-black/60 backdrop-blur-xs text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md z-10">
-        {img.source === "upload" ? "Uploaded" : "Unsplash"}
-      </span>
-
-      {/* Image Preview / Error Fallback */}
       <div className="relative w-full h-full flex items-center justify-center p-2">
         {loadError ? (
           <div className="flex flex-col items-center justify-center text-center p-2 text-rose-600 space-y-1">
             <AlertTriangle size={20} />
             <span className="text-[9px] font-bold leading-tight">
-              Unable to load this image. Please check the URL.
+              Unable to load image
             </span>
           </div>
         ) : (
@@ -148,7 +97,6 @@ function ImageThumb({
         )}
       </div>
 
-      {/* Hover Controls Overlay */}
       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 z-20 p-2">
         {!img.isPrimary && (
           <button
@@ -171,43 +119,77 @@ function ImageThumb({
   );
 }
 
-/* ─────────────────────────────────────────────
-   Main Page
-───────────────────────────────────────────── */
-export default function AddProductPage() {
+export default function EditProductPage() {
   const router = useRouter();
+  const params = useParams();
+  const productId = params.id as string;
 
-  /* — Form Fields — */
+  const [isLoading, setIsLoading] = useState(true);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [price, setPrice] = useState("");
+  const [comparePrice, setComparePrice] = useState("");
   const [category, setCategory] = useState("accessories");
   const [description, setDescription] = useState("");
   const [stock, setStock] = useState("50");
 
-  /* — Homepage Section Visibility Flags — */
   const [isBestSeller, setIsBestSeller] = useState(false);
   const [isNewArrival, setIsNewArrival] = useState(false);
   const [isFlashSale, setIsFlashSale] = useState(false);
 
-  /* — Image State — */
   const [images, setImages] = useState<ProductImageItem[]>([]);
   const [uploadingCount, setUploadingCount] = useState(0);
   const [uploadError, setUploadError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [activeTab, setActiveTab] = useState<"device" | "url">("device");
-
-  /* — URL Input State — */
   const [urlInput, setUrlInput] = useState("");
   const [urlError, setUrlError] = useState("");
 
-  /* — Save State — */
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /* ── Process uploaded files ── */
+  useEffect(() => {
+    async function loadProduct() {
+      try {
+        const prod: any = await fetchApi(`/api/admin/products/${productId}`);
+        setName(prod.name || "");
+        setSlug(prod.slug || "");
+        setPrice(prod.price ? String(prod.price) : "");
+        setComparePrice(prod.comparePrice ? String(prod.comparePrice) : "");
+        setDescription(prod.description || "");
+        setCategory(prod.category?.slug || "accessories");
+        setIsBestSeller(Boolean(prod.isBestSeller));
+        setIsNewArrival(Boolean(prod.isNewArrival));
+        setIsFlashSale(Boolean(prod.isFlashSale));
+
+        const primaryVariant = prod.variants?.[0];
+        if (primaryVariant && primaryVariant.stock !== undefined) {
+          setStock(String(primaryVariant.stock));
+        }
+
+        if (Array.isArray(prod.images) && prod.images.length > 0) {
+          const loadedImgs: ProductImageItem[] = prod.images.map((img: any, idx: number) => ({
+            key: img.id || `${Date.now()}-${idx}`,
+            url: img.url,
+            isPrimary: Boolean(img.isPrimary),
+            name: `Product Image ${idx + 1}`,
+            source: img.url.includes("unsplash.com") ? "url" : "upload",
+          }));
+          setImages(loadedImgs);
+        }
+      } catch (err: any) {
+        setErrorMsg(err.message || "Failed to load product");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    if (productId) {
+      loadProduct();
+    }
+  }, [productId]);
+
   const processFiles = useCallback(async (files: FileList | File[]) => {
     const fileArr = Array.from(files);
     setUploadError("");
@@ -215,7 +197,7 @@ export default function AddProductPage() {
     const toUpload: File[] = [];
     for (const file of fileArr) {
       if (!ACCEPTED_TYPES.includes(file.type)) {
-        setUploadError(`"${file.name}" is not a supported format. Use JPG, PNG, or WEBP.`);
+        setUploadError(`"${file.name}" is not supported. Use JPG, PNG, or WEBP.`);
         continue;
       }
       if (file.size > MAX_SIZE_BYTES) {
@@ -228,14 +210,10 @@ export default function AddProductPage() {
     if (toUpload.length === 0) return;
 
     setUploadingCount((c) => c + toUpload.length);
-
     const results = await Promise.allSettled(toUpload.map(uploadFile));
-
     setUploadingCount((c) => c - toUpload.length);
 
     const newImages: ProductImageItem[] = [];
-    const errors: string[] = [];
-
     results.forEach((result, idx) => {
       if (result.status === "fulfilled") {
         newImages.push({
@@ -245,14 +223,8 @@ export default function AddProductPage() {
           isPrimary: false,
           source: "upload",
         });
-      } else {
-        errors.push(`"${toUpload[idx].name}": ${result.reason?.message || "Upload failed"}`);
       }
     });
-
-    if (errors.length > 0) {
-      setUploadError(errors.join(" | "));
-    }
 
     if (newImages.length > 0) {
       setImages((prev) => {
@@ -266,35 +238,19 @@ export default function AddProductPage() {
     }
   }, []);
 
-  /* ── Drag & Drop ── */
-  const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
-  const onDragLeave = () => setIsDragging(false);
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files.length) processFiles(e.dataTransfer.files);
-  };
-
-  /* ── Add Image URL ── */
   const handleAddUrl = (e: React.FormEvent) => {
     e.preventDefault();
     setUrlError("");
-
-    const existingUrls = images.map((img) => img.url);
-    const { valid, error } = validateImageUrl(urlInput, existingUrls);
-
-    if (!valid && error) {
-      setUrlError(error);
+    if (!urlInput.trim() || !isValidImageUrl(urlInput.trim())) {
+      setUrlError("Please enter a valid image URL.");
       return;
     }
 
     const trimmedUrl = urlInput.trim();
-    const isUnsplash = trimmedUrl.includes("unsplash.com");
-
     const newImg: ProductImageItem = {
       key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       url: trimmedUrl,
-      name: isUnsplash ? "Unsplash Image" : "External Image",
+      name: "External Image",
       isPrimary: false,
       source: "url",
     };
@@ -307,11 +263,9 @@ export default function AddProductPage() {
       }
       return combined;
     });
-
     setUrlInput("");
   };
 
-  /* ── Remove Image ── */
   const handleRemove = (key: string) => {
     setImages((prev) => {
       const filtered = prev.filter((img) => img.key !== key);
@@ -323,18 +277,16 @@ export default function AddProductPage() {
     });
   };
 
-  /* ── Set Primary ── */
   const handleSetPrimary = (key: string) => {
     setImages((prev) =>
       prev.map((img) => ({ ...img, isPrimary: img.key === key }))
     );
   };
 
-  /* ── Submit Form ── */
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (uploadingCount > 0) {
-      setErrorMsg("Please wait for all images to finish uploading.");
+      setErrorMsg("Please wait for all uploads to complete.");
       return;
     }
 
@@ -342,12 +294,13 @@ export default function AddProductPage() {
     setErrorMsg("");
 
     try {
-      await fetchApi("/api/admin/products", {
-        method: "POST",
+      await fetchApi(`/api/admin/products/${productId}`, {
+        method: "PUT",
         body: JSON.stringify({
           name,
           slug,
           price,
+          comparePrice: comparePrice || null,
           categorySlug: category,
           description,
           stock,
@@ -358,19 +311,24 @@ export default function AddProductPage() {
         }),
       });
       router.push("/admin/products");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to create product";
-      setErrorMsg(msg);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to update product");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const isUploading = uploadingCount > 0;
+  if (isLoading) {
+    return (
+      <div className="p-12 flex justify-center items-center text-purple-600 gap-2">
+        <Loader2 className="animate-spin" size={24} />
+        <span className="text-xs font-bold">Loading product details...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-4xl">
-      {/* Header */}
       <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-gray-200/70 shadow-2xs">
         <Link
           href="/admin/products"
@@ -378,7 +336,7 @@ export default function AddProductPage() {
         >
           <ArrowLeft size={16} /> Back to Products
         </Link>
-        <h1 className="text-xl font-serif font-extrabold text-gray-900">Add New Product</h1>
+        <h1 className="text-xl font-serif font-extrabold text-gray-900">Edit Product</h1>
       </div>
 
       {errorMsg && (
@@ -389,7 +347,7 @@ export default function AddProductPage() {
       )}
 
       <form onSubmit={handleSave} className="space-y-6">
-        {/* ── Product Details Card ── */}
+        {/* Product Details Card */}
         <div className="bg-white border border-gray-200/70 p-6 md:p-8 rounded-3xl space-y-6 text-xs shadow-2xs">
           <h2 className="text-sm font-bold text-gray-900 border-b border-gray-100 pb-3">
             Product Details
@@ -404,9 +362,8 @@ export default function AddProductPage() {
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value);
-                  setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+                  if (!slug) setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
                 }}
-                placeholder="e.g. Italian Leather Duffel Bag"
                 className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden focus:border-purple-600"
               />
             </div>
@@ -446,7 +403,17 @@ export default function AddProductPage() {
                 required
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                placeholder="12999"
+                className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden focus:border-purple-600"
+              />
+            </div>
+
+            <div>
+              <label className="font-bold text-gray-800 block mb-1">Compare Price (Optional)</label>
+              <input
+                type="number"
+                step="1"
+                value={comparePrice}
+                onChange={(e) => setComparePrice(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden focus:border-purple-600"
               />
             </div>
@@ -469,24 +436,18 @@ export default function AddProductPage() {
                 required
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe craftsmanship, specifications..."
                 className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden focus:border-purple-600"
               />
             </div>
           </div>
         </div>
 
-        {/* ── Homepage Section Visibility Card ── */}
+        {/* Homepage Section Visibility Card */}
         <div className="bg-white border border-gray-200/70 p-6 md:p-8 rounded-3xl space-y-4 text-xs shadow-2xs">
           <h2 className="text-sm font-bold text-gray-900 border-b border-gray-100 pb-3">
             Homepage Section Visibility
           </h2>
-          <p className="text-[11px] text-gray-500">
-            Control which customer homepage sections display this product upon saving.
-          </p>
-
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-            {/* Best Seller */}
             <label
               className={`flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition select-none ${
                 isBestSeller
@@ -504,12 +465,11 @@ export default function AddProductPage() {
                 <Flame size={16} className={isBestSeller ? "text-amber-500 fill-amber-500" : "text-gray-400"} />
                 <div>
                   <p className="font-bold">Best Seller</p>
-                  <p className="text-[10px] text-gray-500">Feature in Best Sellers strip</p>
+                  <p className="text-[10px] text-gray-500">Feature in Best Sellers</p>
                 </div>
               </div>
             </label>
 
-            {/* New Arrival */}
             <label
               className={`flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition select-none ${
                 isNewArrival
@@ -527,12 +487,11 @@ export default function AddProductPage() {
                 <Sparkles size={16} className={isNewArrival ? "text-blue-500 fill-blue-500" : "text-gray-400"} />
                 <div>
                   <p className="font-bold">New Arrival</p>
-                  <p className="text-[10px] text-gray-500">Feature in New Arrivals list</p>
+                  <p className="text-[10px] text-gray-500">Feature in New Arrivals</p>
                 </div>
               </div>
             </label>
 
-            {/* Flash Sale */}
             <label
               className={`flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition select-none ${
                 isFlashSale
@@ -550,26 +509,22 @@ export default function AddProductPage() {
                 <Zap size={16} className={isFlashSale ? "text-purple-500 fill-purple-500" : "text-gray-400"} />
                 <div>
                   <p className="font-bold">Flash Sale</p>
-                  <p className="text-[10px] text-gray-500">Mark product for Flash Sale</p>
+                  <p className="text-[10px] text-gray-500">Mark for Flash Sale</p>
                 </div>
               </div>
             </label>
           </div>
         </div>
 
-        {/* ── Product Images Card (Dual Source: Upload & Unsplash URL) ── */}
+        {/* Product Images Card */}
         <div className="bg-white border border-gray-200/70 p-6 md:p-8 rounded-3xl space-y-6 text-xs shadow-2xs">
           <div className="flex items-center justify-between border-b border-gray-100 pb-3">
             <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
               <ImageIcon size={16} className="text-purple-600" />
               Product Images
             </h2>
-            <span className="text-[10px] text-gray-400 font-semibold">
-              Support Device Uploads &amp; Unsplash URLs
-            </span>
           </div>
 
-          {/* Source Tabs Header */}
           <div className="flex border-b border-gray-200 gap-6">
             <button
               type="button"
@@ -580,8 +535,7 @@ export default function AddProductPage() {
                   : "border-transparent text-gray-500 hover:text-gray-800"
               }`}
             >
-              <UploadCloud size={15} />
-              Upload from device
+              <UploadCloud size={15} /> Upload from device
             </button>
             <button
               type="button"
@@ -592,74 +546,35 @@ export default function AddProductPage() {
                   : "border-transparent text-gray-500 hover:text-gray-800"
               }`}
             >
-              <Link2 size={15} />
-              Use image URL (Unsplash)
+              <Link2 size={15} /> Use image URL
             </button>
           </div>
 
-          {/* Source 1: Upload from device */}
           {activeTab === "device" && (
-            <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="space-y-4">
               {uploadError && (
                 <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-[11px] font-semibold flex items-center gap-2">
                   <AlertCircle size={14} className="shrink-0" />
                   {uploadError}
                 </div>
               )}
-
               <div
-                onDragOver={onDragOver}
-                onDragLeave={onDragLeave}
-                onDrop={onDrop}
-                onClick={() => !isUploading && fileInputRef.current?.click()}
-                className={`
-                  relative flex flex-col items-center justify-center gap-3
-                  border-2 border-dashed rounded-2xl p-8 cursor-pointer
-                  transition-all duration-200 select-none
-                  ${
-                    isDragging
-                      ? "border-purple-400 bg-purple-50"
-                      : "border-gray-200 bg-gray-50/60 hover:border-purple-300 hover:bg-purple-50/30"
-                  }
-                  ${isUploading ? "pointer-events-none opacity-70" : ""}
-                `}
+                onClick={() => !uploadingCount && fileInputRef.current?.click()}
+                className="relative flex flex-col items-center justify-center gap-3 border-2 border-dashed border-gray-200 bg-gray-50/60 rounded-2xl p-8 cursor-pointer hover:border-purple-300 hover:bg-purple-50/30 transition select-none"
               >
-                {isUploading ? (
+                {uploadingCount > 0 ? (
                   <>
                     <Loader2 size={28} className="animate-spin text-purple-500" />
-                    <p className="text-[11px] font-semibold text-gray-500">
-                      Uploading {uploadingCount} image{uploadingCount > 1 ? "s" : ""}…
-                    </p>
+                    <p className="text-[11px] font-semibold text-gray-500">Uploading...</p>
                   </>
                 ) : (
                   <>
                     <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center">
                       <UploadCloud size={22} className="text-purple-500" />
                     </div>
-                    <div className="text-center">
-                      <p className="text-xs font-bold text-gray-700">
-                        Drag &amp; drop images here, or{" "}
-                        <span className="text-purple-600 underline underline-offset-2 cursor-pointer">
-                          browse
-                        </span>
-                      </p>
-                      <p className="text-[10px] text-gray-400 mt-1">
-                        Supports JPG, PNG, WEBP · Up to {MAX_SIZE_MB} MB per image
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        fileInputRef.current?.click();
-                      }}
-                      className="inline-flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold px-4 py-2 rounded-full transition shadow cursor-pointer"
-                    >
-                      <UploadCloud size={13} /> Upload Images
-                    </button>
+                    <p className="text-xs font-bold text-gray-700">Click to upload new images</p>
                   </>
                 )}
-
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -677,58 +592,27 @@ export default function AddProductPage() {
             </div>
           )}
 
-          {/* Source 2: Use image URL */}
           {activeTab === "url" && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="space-y-2">
-                <label className="font-bold text-gray-800 block">
-                  Image URL (Unsplash or direct image link)
-                </label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="url"
-                      value={urlInput}
-                      onChange={(e) => {
-                        setUrlInput(e.target.value);
-                        setUrlError("");
-                      }}
-                      placeholder="https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800"
-                      className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 font-mono outline-hidden focus:border-purple-600 text-xs"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddUrl}
-                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-5 py-3 rounded-xl transition shadow flex items-center gap-1.5 shrink-0 cursor-pointer text-xs"
-                  >
-                    <Plus size={15} /> Add Image URL
-                  </button>
-                </div>
-                {urlError && (
-                  <p className="text-rose-600 text-[11px] font-semibold flex items-center gap-1 mt-1">
-                    <AlertCircle size={13} /> {urlError}
-                  </p>
-                )}
-                <p className="text-[10px] text-gray-400">
-                  Example: https://images.unsplash.com/photo-1505740420928-5e560c06d30e
-                </p>
-              </div>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={urlInput}
+                onChange={(e) => { setUrlInput(e.target.value); setUrlError(""); }}
+                placeholder="https://images.unsplash.com/..."
+                className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 font-mono text-xs outline-hidden focus:border-purple-600"
+              />
+              <button
+                type="button"
+                onClick={handleAddUrl}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-5 py-3 rounded-xl transition shrink-0 cursor-pointer text-xs"
+              >
+                Add URL
+              </button>
             </div>
           )}
 
-          {/* ── Unified Image Gallery (Mixed Uploads & Unsplash URLs) ── */}
           {images.length > 0 && (
             <div className="space-y-3 pt-2 border-t border-gray-100">
-              <div className="flex justify-between items-center">
-                <p className="text-[11px] text-gray-700 font-bold uppercase tracking-wider">
-                  Image Gallery ({images.length})
-                </p>
-                <span className="text-[10px] text-gray-400 font-semibold">
-                  Hover image to set primary or remove
-                </span>
-              </div>
-
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {images.map((img) => (
                   <ImageThumb
@@ -739,47 +623,25 @@ export default function AddProductPage() {
                   />
                 ))}
               </div>
-
-              {/* Primary Image Notice */}
-              <div className="flex items-center gap-2 text-[10px] text-gray-600 bg-purple-50 border border-purple-100 rounded-xl p-3">
-                <CheckCircle2 size={14} className="text-purple-600 shrink-0" />
-                <span>
-                  Primary image is set to:{" "}
-                  <strong className="text-purple-700 font-bold">
-                    {images.find((img) => img.isPrimary)?.name || "First item"}
-                  </strong>
-                </span>
-              </div>
             </div>
-          )}
-
-          {images.length === 0 && !isUploading && (
-            <p className="text-[10px] text-gray-400 text-center py-2">
-              No images added yet. Add images by uploading from device or pasting an Unsplash URL above.
-            </p>
           )}
         </div>
 
-        {/* ── Save Button ── */}
+        {/* Save Button */}
         <button
           type="submit"
-          disabled={isSaving || isUploading}
-          className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+          disabled={isSaving || uploadingCount > 0}
+          className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
         >
           {isSaving ? (
             <>
               <Loader2 className="animate-spin" size={18} />
-              <span>Saving Product...</span>
-            </>
-          ) : isUploading ? (
-            <>
-              <Loader2 className="animate-spin" size={18} />
-              <span>Waiting for uploads to finish...</span>
+              <span>Saving Changes...</span>
             </>
           ) : (
             <>
               <Save size={18} />
-              <span>Save Product</span>
+              <span>Update Product</span>
             </>
           )}
         </button>

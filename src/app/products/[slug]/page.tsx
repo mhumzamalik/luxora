@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { ProductCard } from "@/components/product/ProductCard";
 import { formatCurrency } from "@/lib/currency";
+import { getOrderedImages } from "@/lib/images";
 
 interface ProductReview {
   id: string;
@@ -99,10 +100,8 @@ export default function ProductDetailPage({
   const product = data?.product;
   const relatedProducts = data?.relatedProducts || [];
 
-  const images = product?.images?.map((i: { url: string }) => i.url) || [
-    "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1000&q=80",
-  ];
-
+  const orderedImageList = getOrderedImages(product);
+  const images: string[] = orderedImageList.map((img) => img.url);
   const activeImage = images[activeImageIndex] || images[0];
   const isWishlisted = product ? wishlistStore.isInWishlist(product.id) : false;
 
@@ -255,13 +254,17 @@ export default function ProductDetailPage({
           {/* Gallery Column */}
           <div className="lg:col-span-7 space-y-4">
             <div className="relative w-full aspect-square bg-[#F8F8F8] rounded-2xl overflow-hidden group">
-              <Image
-                src={activeImage}
-                alt={product.name}
-                fill
-                priority
-                className="object-contain p-8 transition-transform duration-500 group-hover:scale-110"
-              />
+              {activeImage ? (
+                <Image
+                  src={activeImage}
+                  alt={product.name}
+                  fill
+                  priority
+                  className="object-contain p-8 transition-transform duration-500 group-hover:scale-110"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-300 text-sm">No image</div>
+              )}
             </div>
             <div className="flex space-x-3 overflow-x-auto pb-2">
               {images.map((img: string, idx: number) => (
@@ -272,7 +275,7 @@ export default function ProductDetailPage({
                     activeImageIndex === idx ? "border-black" : "border-transparent"
                   }`}
                 >
-                  <Image src={img} alt="Thumbnail" fill className="object-contain p-2" />
+                  {img && <Image src={img} alt="Thumbnail" fill className="object-contain p-2" />}
                 </button>
               ))}
             </div>

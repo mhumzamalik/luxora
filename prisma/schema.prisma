@@ -1,6 +1,3 @@
-// LUXORA Enterprise E-Commerce Platform Prisma Schema
-// Database: Supabase PostgreSQL with Row Level Security
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,6 +6,329 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String          @id @default(cuid())
+  name          String?
+  email         String          @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  role          Role            @default(CUSTOMER)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  accounts      Account[]
+  addresses     Address[]
+  auditLogs     AdminAuditLog[]
+  cart          Cart?
+  orders        Order[]
+  reviews       Review[]
+  sessions      Session[]
+  wishlist      Wishlist?
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  createdAt  DateTime @default(now()) @map("created_at")
+  id         String   @id @default(cuid())
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String?
+  imageUrl    String?
+  parentId    String?    @map("parent_id")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  parent      Category?  @relation("SubCategories", fields: [parentId], references: [id])
+  children    Category[] @relation("SubCategories")
+  products    Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id             String           @id @default(cuid())
+  name           String
+  slug           String           @unique
+  description    String
+  price          Float
+  comparePrice   Float?           @map("compare_price")
+  badge          String?
+  rating         Float            @default(5.0)
+  reviewCount    Int              @default(0) @map("review_count")
+  isFlashSale    Boolean          @default(false) @map("is_flash_sale")
+  isBestSeller   Boolean          @default(false) @map("is_best_seller")
+  isNewArrival   Boolean          @default(false) @map("is_new_arrival")
+  categoryId     String           @map("category_id")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  cartItems      CartItem[]
+  flashSaleItems FlashSaleItem[]
+  orderItems     OrderItem[]
+  images         ProductImage[]
+  variants       ProductVariant[]
+  category       Category         @relation(fields: [categoryId], references: [id])
+  reviews        Review[]
+  wishlistItems  WishlistItem[]
+
+  @@map("products")
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  url       String
+  alt       String?
+  productId String  @map("product_id")
+  isPrimary Boolean @default(false) @map("is_primary")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_images")
+}
+
+model ProductVariant {
+  id         String      @id @default(cuid())
+  productId  String      @map("product_id")
+  size       String?
+  color      String?
+  colorHex   String?     @map("color_hex")
+  sku        String      @unique
+  stock      Int         @default(0)
+  reserved   Int         @default(0)
+  price      Float?
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_variants")
+}
+
+model Address {
+  id         String  @id @default(cuid())
+  userId     String? @map("user_id")
+  fullName   String  @map("full_name")
+  street     String
+  city       String
+  state      String
+  postalCode String  @map("postal_code")
+  country    String
+  phone      String
+  isDefault  Boolean @default(false) @map("is_default")
+  user       User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders     Order[]
+
+  @@map("addresses")
+}
+
+model Order {
+  id                String        @id @default(cuid())
+  orderNumber       String        @unique @map("order_number")
+  userId            String?       @map("user_id")
+  guestEmail        String?       @map("guest_email")
+  shippingAddressId String?       @map("shipping_address_id")
+  status            OrderStatus   @default(PENDING)
+  paymentStatus     PaymentStatus @default(PENDING) @map("payment_status")
+  paymentMethod     PaymentMethod @default(BANK_TRANSFER) @map("payment_method")
+  paymentProofUrl   String?       @map("payment_proof_url")
+  subtotal          Float
+  discountAmount    Float         @default(0) @map("discount_amount")
+  shippingFee       Float         @default(0) @map("shipping_fee")
+  total             Float
+  couponCode        String?       @map("coupon_code")
+  bankReference     String        @unique @map("bank_reference")
+  notes             String?
+  paidAt            DateTime?     @map("paid_at")
+  shippedAt         DateTime?     @map("shipped_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  items             OrderItem[]
+  shippingAddress   Address?      @relation(fields: [shippingAddressId], references: [id])
+  user              User?         @relation(fields: [userId], references: [id])
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String          @id @default(cuid())
+  orderId    String          @map("order_id")
+  productId  String          @map("product_id")
+  variantId  String?         @map("variant_id")
+  quantity   Int
+  unitPrice  Float           @map("unit_price")
+  totalPrice Float           @map("total_price")
+  order      Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product         @relation(fields: [productId], references: [id])
+  variant    ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@map("order_items")
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String?    @unique @map("user_id")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  items     CartItem[]
+  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String          @id @default(cuid())
+  cartId    String          @map("cart_id")
+  productId String          @map("product_id")
+  variantId String?         @map("variant_id")
+  quantity  Int
+  cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@map("cart_items")
+}
+
+model Wishlist {
+  id     String         @id @default(cuid())
+  userId String         @unique @map("user_id")
+  items  WishlistItem[]
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("wishlists")
+}
+
+model WishlistItem {
+  id         String   @id @default(cuid())
+  wishlistId String   @map("wishlist_id")
+  productId  String   @map("product_id")
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+
+  @@map("wishlist_items")
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String   @map("product_id")
+  userId    String   @map("user_id")
+  rating    Int
+  title     String?
+  comment   String
+  createdAt DateTime @default(now()) @map("created_at")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}
+
+model Coupon {
+  id             String    @id @default(cuid())
+  code           String    @unique
+  discountType   String    @map("discount_type")
+  discountValue  Float     @map("discount_value")
+  minOrderAmount Float?    @map("min_order_amount")
+  maxDiscount    Float?    @map("max_discount")
+  usageLimit     Int?      @map("usage_limit")
+  usedCount      Int       @default(0) @map("used_count")
+  expiresAt      DateTime? @map("expires_at")
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@map("coupons")
+}
+
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  details   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("admin_audit_logs")
+}
+
+model FlashSale {
+  id        String          @id @default(cuid())
+  title     String
+  startDate DateTime        @map("start_date")
+  endDate   DateTime        @map("end_date")
+  isActive  Boolean         @default(true) @map("is_active")
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+  items     FlashSaleItem[]
+
+  @@map("flash_sales")
+}
+
+model FlashSaleItem {
+  id          String    @id @default(cuid())
+  flashSaleId String    @map("flash_sale_id")
+  productId   String    @map("product_id")
+  salePrice   Float     @map("sale_price")
+  flashSale   FlashSale @relation(fields: [flashSaleId], references: [id], onDelete: Cascade)
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([flashSaleId, productId])
+  @@map("flash_sale_items")
+}
+
+model Banner {
+  id             String    @id @default(cuid())
+  title          String
+  subtitle       String?
+  description    String?
+  imageUrl       String    @map("image_url")
+  mobileImageUrl String?   @map("mobile_image_url")
+  linkUrl        String?   @map("link_url")
+  ctaText        String?   @map("cta_text")
+  position       Int       @default(0)
+  type           String    @default("HERO")
+  isActive       Boolean   @default(true) @map("is_active")
+  startDate      DateTime? @map("start_date")
+  endDate        DateTime? @map("end_date")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@map("banners")
 }
 
 enum Role {
@@ -38,331 +358,4 @@ enum PaymentMethod {
   CREDIT_CARD
   PAYPAL
   COD
-}
-
-model User {
-  id            String          @id @default(cuid())
-  name          String?
-  email         String          @unique
-  emailVerified DateTime?
-  image         String?
-  passwordHash  String?
-  role          Role            @default(CUSTOMER)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-
-  accounts      Account[]
-  sessions      Session[]
-  addresses     Address[]
-  orders        Order[]
-  reviews       Review[]
-  wishlist      Wishlist?
-  cart          Cart?
-  auditLogs     AdminAuditLog[]
-
-  @@map("users")
-}
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String  @map("user_id")
-  type              String
-  provider          String
-  providerAccountId String  @map("provider_account_id")
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@map("accounts")
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique @map("session_token")
-  userId       String   @map("user_id")
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("sessions")
-}
-
-model VerificationToken {
-  id         String   @id @default(cuid())
-  identifier String
-  token      String   @unique
-  expires    DateTime
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  @@unique([identifier, token])
-  @@map("verification_tokens")
-}
-
-model Category {
-  id          String     @id @default(cuid())
-  name        String
-  slug        String     @unique
-  description String?
-  imageUrl    String?
-  parentId    String?    @map("parent_id")
-  parent      Category?  @relation("SubCategories", fields: [parentId], references: [id])
-  children    Category[] @relation("SubCategories")
-  products    Product[]
-  createdAt   DateTime   @default(now()) @map("created_at")
-
-  @@map("categories")
-}
-
-model Product {
-  id            String           @id @default(cuid())
-  name          String
-  slug          String           @unique
-  description   String           @db.Text
-  price         Float
-  comparePrice  Float?           @map("compare_price")
-  badge         String?          // e.g. "-20%", "New", "Trending"
-  rating        Float            @default(5.0)
-  reviewCount   Int              @default(0) @map("review_count")
-  isFlashSale   Boolean          @default(false) @map("is_flash_sale")
-  isBestSeller  Boolean          @default(false) @map("is_best_seller")
-  isNewArrival  Boolean          @default(false) @map("is_new_arrival")
-  categoryId    String           @map("category_id")
-  category      Category         @relation(fields: [categoryId], references: [id])
-  images        ProductImage[]
-  variants      ProductVariant[]
-  reviews       Review[]
-  orderItems    OrderItem[]
-  cartItems     CartItem[]
-  wishlistItems WishlistItem[]
-  flashSaleItems FlashSaleItem[]
-  createdAt     DateTime         @default(now()) @map("created_at")
-  updatedAt     DateTime         @updatedAt @map("updated_at")
-
-  @@map("products")
-}
-
-model ProductImage {
-  id        String   @id @default(cuid())
-  url       String
-  alt       String?
-  productId String   @map("product_id")
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  isPrimary Boolean  @default(false) @map("is_primary")
-
-  @@map("product_images")
-}
-
-model ProductVariant {
-  id         String      @id @default(cuid())
-  productId  String      @map("product_id")
-  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  size       String?
-  color      String?
-  colorHex   String?     @map("color_hex")
-  sku        String      @unique
-  stock      Int         @default(0)
-  reserved   Int         @default(0)
-  price      Float?
-  orderItems OrderItem[]
-  cartItems  CartItem[]
-
-  @@map("product_variants")
-}
-
-model Address {
-  id         String   @id @default(cuid())
-  userId     String?  @map("user_id")
-  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fullName   String   @map("full_name")
-  street     String
-  city       String
-  state      String
-  postalCode String   @map("postal_code")
-  country    String
-  phone      String
-  isDefault  Boolean  @default(false) @map("is_default")
-  orders     Order[]
-
-  @@map("addresses")
-}
-
-model Order {
-  id                String        @id @default(cuid())
-  orderNumber       String        @unique @map("order_number")
-  userId            String?       @map("user_id")
-  user              User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
-  guestEmail        String?       @map("guest_email")
-  shippingAddressId String?       @map("shipping_address_id")
-  shippingAddress   Address?      @relation(fields: [shippingAddressId], references: [id])
-  status            OrderStatus   @default(PENDING)
-  paymentStatus     PaymentStatus @default(PENDING) @map("payment_status")
-  paymentMethod     PaymentMethod @default(BANK_TRANSFER) @map("payment_method")
-  paymentProofUrl   String?       @map("payment_proof_url")
-  subtotal          Float
-  discountAmount    Float         @default(0) @map("discount_amount")
-  shippingFee       Float         @default(0) @map("shipping_fee")
-  total             Float
-  couponCode        String?       @map("coupon_code")
-  bankReference     String        @unique @map("bank_reference")
-  notes             String?
-  paidAt            DateTime?     @map("paid_at")
-  shippedAt         DateTime?     @map("shipped_at")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
-
-  items             OrderItem[]
-
-  @@map("orders")
-}
-
-model OrderItem {
-  id         String          @id @default(cuid())
-  orderId    String          @map("order_id")
-  order      Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId  String          @map("product_id")
-  product    Product         @relation(fields: [productId], references: [id])
-  variantId  String?         @map("variant_id")
-  variant    ProductVariant? @relation(fields: [variantId], references: [id])
-  quantity   Int
-  unitPrice  Float           @map("unit_price")
-  totalPrice Float           @map("total_price")
-
-  @@map("order_items")
-}
-
-model Cart {
-  id        String     @id @default(cuid())
-  userId    String?    @unique @map("user_id")
-  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items     CartItem[]
-  updatedAt DateTime   @updatedAt @map("updated_at")
-
-  @@map("carts")
-}
-
-model CartItem {
-  id        String          @id @default(cuid())
-  cartId    String          @map("cart_id")
-  cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  productId String          @map("product_id")
-  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  variantId String?         @map("variant_id")
-  variant   ProductVariant? @relation(fields: [variantId], references: [id])
-  quantity  Int
-
-  @@map("cart_items")
-}
-
-model Wishlist {
-  id        String         @id @default(cuid())
-  userId    String         @unique @map("user_id")
-  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items     WishlistItem[]
-
-  @@map("wishlists")
-}
-
-model WishlistItem {
-  id         String   @id @default(cuid())
-  wishlistId String   @map("wishlist_id")
-  wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
-  productId  String   @map("product_id")
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@map("wishlist_items")
-}
-
-model Review {
-  id        String   @id @default(cuid())
-  productId String   @map("product_id")
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  userId    String   @map("user_id")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rating    Int
-  title     String?
-  comment   String   @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("reviews")
-}
-
-model Coupon {
-  id             String    @id @default(cuid())
-  code           String    @unique
-  discountType   String    @map("discount_type") // "PERCENTAGE" or "FIXED"
-  discountValue  Float     @map("discount_value")
-  minOrderAmount Float?    @map("min_order_amount")
-  maxDiscount    Float?    @map("max_discount")
-  usageLimit     Int?      @map("usage_limit")
-  usedCount      Int       @default(0) @map("used_count")
-  expiresAt      DateTime? @map("expires_at")
-  isActive       Boolean   @default(true) @map("is_active")
-  createdAt      DateTime  @default(now()) @map("created_at")
-
-  @@map("coupons")
-}
-
-model AdminAuditLog {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  user      User     @relation(fields: [userId], references: [id])
-  action    String
-  entity    String
-  entityId  String?  @map("entity_id")
-  details   String?  @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("admin_audit_logs")
-}
-
-model FlashSale {
-  id        String          @id @default(cuid())
-  title     String
-  startDate DateTime        @map("start_date")
-  endDate   DateTime        @map("end_date")
-  isActive  Boolean         @default(true) @map("is_active")
-  createdAt DateTime        @default(now()) @map("created_at")
-  updatedAt DateTime        @updatedAt @map("updated_at")
-
-  items     FlashSaleItem[]
-
-  @@map("flash_sales")
-}
-
-model FlashSaleItem {
-  id          String    @id @default(cuid())
-  flashSaleId String    @map("flash_sale_id")
-  flashSale   FlashSale @relation(fields: [flashSaleId], references: [id], onDelete: Cascade)
-  productId   String    @map("product_id")
-  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  salePrice   Float     @map("sale_price")
-
-  @@unique([flashSaleId, productId])
-  @@map("flash_sale_items")
-}
-
-model Banner {
-  id             String    @id @default(cuid())
-  title          String
-  subtitle       String?
-  description    String?   @db.Text
-  imageUrl       String    @map("image_url")
-  mobileImageUrl String?   @map("mobile_image_url")
-  linkUrl        String?   @map("link_url")
-  ctaText        String?   @map("cta_text")
-  position       Int       @default(0)
-  type           String    @default("HERO") // "HERO", "PROMO"
-  isActive       Boolean   @default(true) @map("is_active")
-  startDate      DateTime? @map("start_date")
-  endDate        DateTime? @map("end_date")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-
-  @@map("banners")
 }

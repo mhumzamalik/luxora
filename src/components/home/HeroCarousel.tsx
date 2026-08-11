@@ -149,6 +149,7 @@ export function HeroCarousel() {
                 alt={slide.title}
                 fill
                 priority
+                sizes="(max-width: 1024px) 100vw, 50vw"
                 className="object-cover object-center rounded-2xl"
               />
 
