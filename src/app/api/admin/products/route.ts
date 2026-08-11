@@ -84,6 +84,7 @@ export async function POST(req: Request) {
       isBestSeller,
       isNewArrival,
       isFlashSale,
+      variants,
     } = body;
 
     if (!name || !price) {
@@ -141,13 +142,23 @@ export async function POST(req: Request) {
           ? { create: imageCreatePayload }
           : undefined,
         variants: {
-          create: [
-            {
-              sku: `${generatedSlug}-${Date.now()}`,
-              stock: stock !== undefined ? parseInt(String(stock), 10) : 50,
-              price: parseFloat(String(price)),
-            },
-          ],
+          create:
+            Array.isArray(variants) && variants.length > 0
+              ? variants.map((v: any, idx: number) => ({
+                  size: v.size ? String(v.size).trim() : null,
+                  color: v.color ? String(v.color).trim() : null,
+                  colorHex: v.colorHex ? String(v.colorHex).trim() : null,
+                  sku: v.sku ? String(v.sku).trim() : `${generatedSlug}-${idx + 1}-${Date.now()}`,
+                  stock: v.stock !== undefined && v.stock !== null ? Math.max(0, parseInt(String(v.stock), 10) || 0) : 10,
+                  price: v.price ? parseFloat(String(v.price)) : null,
+                }))
+              : [
+                  {
+                    sku: `${generatedSlug}-${Date.now()}`,
+                    stock: stock !== undefined ? parseInt(String(stock), 10) : 50,
+                    price: parseFloat(String(price)),
+                  },
+                ],
         },
       },
       include: {

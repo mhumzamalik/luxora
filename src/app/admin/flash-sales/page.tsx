@@ -281,13 +281,12 @@ export default function AdminFlashSalesPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <h2 className="text-base font-serif font-bold text-gray-900">{sale.title}</h2>
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                          isCurrentlyRunning
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${isCurrentlyRunning
                             ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                             : sale.isActive
-                            ? "bg-blue-50 text-blue-700 border border-blue-200"
-                            : "bg-gray-100 text-gray-500 border border-gray-200"
-                        }`}>
+                              ? "bg-blue-50 text-blue-700 border border-blue-200"
+                              : "bg-gray-100 text-gray-500 border border-gray-200"
+                          }`}>
                           {isCurrentlyRunning ? "● Live on Homepage" : sale.isActive ? "Scheduled" : "Inactive"}
                         </span>
                       </div>
@@ -577,21 +576,19 @@ export default function AdminFlashSalesPage() {
                   return (
                     <div
                       key={prod.id}
-                      className={`p-3 rounded-2xl border transition flex items-center justify-between gap-3 ${
-                        isSelected
+                      className={`p-3 rounded-2xl border transition flex items-center justify-between gap-3 ${isSelected
                           ? "bg-purple-50/60 border-purple-300"
                           : "bg-gray-50/50 border-gray-200/80 hover:bg-gray-50"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center space-x-3 min-w-0">
                         <button
                           type="button"
                           onClick={() => toggleProductInPicker(prod)}
-                          className={`w-6 h-6 rounded-lg border flex items-center justify-center transition shrink-0 cursor-pointer ${
-                            isSelected
+                          className={`w-6 h-6 rounded-lg border flex items-center justify-center transition shrink-0 cursor-pointer ${isSelected
                               ? "bg-purple-600 border-purple-600 text-white"
                               : "border-gray-300 bg-white text-transparent"
-                          }`}
+                            }`}
                         >
                           <Check size={14} />
                         </button>

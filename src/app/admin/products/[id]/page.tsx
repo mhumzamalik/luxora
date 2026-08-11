@@ -145,6 +145,41 @@ export default function EditProductPage() {
   const [urlInput, setUrlInput] = useState("");
   const [urlError, setUrlError] = useState("");
 
+  /* — Variants State — */
+  const [variants, setVariants] = useState<
+    { id?: string; size: string; color: string; colorHex: string; sku: string; stock: string; price: string }[]
+  >([]);
+
+  const handleAddVariant = () => {
+    setVariants((prev) => [
+      ...prev,
+      {
+        size: "",
+        color: "",
+        colorHex: "#000000",
+        sku: slug ? `${slug}-${prev.length + 1}` : "",
+        stock: "10",
+        price: "",
+      },
+    ]);
+  };
+
+  const handleRemoveVariant = (index: number) => {
+    setVariants((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateVariant = (
+    index: number,
+    field: "size" | "color" | "colorHex" | "sku" | "stock" | "price",
+    value: string
+  ) => {
+    setVariants((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -164,9 +199,18 @@ export default function EditProductPage() {
         setIsNewArrival(Boolean(prod.isNewArrival));
         setIsFlashSale(Boolean(prod.isFlashSale));
 
-        const primaryVariant = prod.variants?.[0];
-        if (primaryVariant && primaryVariant.stock !== undefined) {
-          setStock(String(primaryVariant.stock));
+        if (Array.isArray(prod.variants) && prod.variants.length > 0) {
+          const loadedVariants = prod.variants.map((v: any) => ({
+            id: v.id,
+            size: v.size || "",
+            color: v.color || "",
+            colorHex: v.colorHex || "#000000",
+            sku: v.sku || "",
+            stock: String(v.stock !== undefined ? v.stock : 0),
+            price: v.price ? String(v.price) : "",
+          }));
+          setVariants(loadedVariants);
+          setStock(String(prod.variants[0]?.stock || 0));
         }
 
         if (Array.isArray(prod.images) && prod.images.length > 0) {
@@ -308,6 +352,15 @@ export default function EditProductPage() {
           isNewArrival: Boolean(isNewArrival),
           isFlashSale: Boolean(isFlashSale),
           images: images.map((img) => ({ url: img.url, isPrimary: img.isPrimary })),
+          variants: variants.map((v) => ({
+            id: v.id,
+            size: v.size,
+            color: v.color,
+            colorHex: v.colorHex,
+            sku: v.sku,
+            stock: v.stock,
+            price: v.price || null,
+          })),
         }),
       });
       router.push("/admin/products");
@@ -440,6 +493,115 @@ export default function EditProductPage() {
               />
             </div>
           </div>
+        </div>
+
+        {/* ── Product Variants & Inventory Card ── */}
+        <div className="bg-white border border-gray-200/70 p-6 md:p-8 rounded-3xl space-y-6 text-xs shadow-2xs">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <div>
+              <h2 className="text-sm font-bold text-gray-900">Product Variants &amp; Inventory</h2>
+              <p className="text-[11px] text-gray-500">
+                Define available sizes, colors, SKUs, and stock levels for this product.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleAddVariant}
+              className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <Plus size={14} /> Add Variant
+            </button>
+          </div>
+
+          {variants.length === 0 ? (
+            <div className="text-center py-6 text-gray-400 text-xs bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+              No variants defined. Click &quot;+ Add Variant&quot; to add sizes, colors, and stock.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-500 font-bold uppercase text-[10px]">
+                    <th className="py-2 px-2">Size</th>
+                    <th className="py-2 px-2">Color Name</th>
+                    <th className="py-2 px-2">Color Hex</th>
+                    <th className="py-2 px-2">SKU</th>
+                    <th className="py-2 px-2">Stock</th>
+                    <th className="py-2 px-2 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {variants.map((v, idx) => (
+                    <tr key={v.id || idx} className="hover:bg-gray-50/50">
+                      <td className="py-2 px-2">
+                        <input
+                          type="text"
+                          value={v.size}
+                          onChange={(e) => handleUpdateVariant(idx, "size", e.target.value)}
+                          placeholder="e.g. S, M, L"
+                          className="w-20 bg-gray-50 border border-gray-200 rounded-lg p-2 font-semibold text-xs"
+                        />
+                      </td>
+                      <td className="py-2 px-2">
+                        <input
+                          type="text"
+                          value={v.color}
+                          onChange={(e) => handleUpdateVariant(idx, "color", e.target.value)}
+                          placeholder="e.g. Coral"
+                          className="w-28 bg-gray-50 border border-gray-200 rounded-lg p-2 font-semibold text-xs"
+                        />
+                      </td>
+                      <td className="py-2 px-2">
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="color"
+                            value={v.colorHex || "#000000"}
+                            onChange={(e) => handleUpdateVariant(idx, "colorHex", e.target.value)}
+                            className="w-7 h-7 rounded-md border border-gray-200 cursor-pointer p-0 bg-transparent"
+                          />
+                          <input
+                            type="text"
+                            value={v.colorHex}
+                            onChange={(e) => handleUpdateVariant(idx, "colorHex", e.target.value)}
+                            placeholder="#FF7F50"
+                            className="w-20 bg-gray-50 border border-gray-200 rounded-lg p-2 font-mono text-[11px]"
+                          />
+                        </div>
+                      </td>
+                      <td className="py-2 px-2">
+                        <input
+                          type="text"
+                          value={v.sku}
+                          onChange={(e) => handleUpdateVariant(idx, "sku", e.target.value)}
+                          placeholder="SKU-001"
+                          className="w-32 bg-gray-50 border border-gray-200 rounded-lg p-2 font-mono text-[11px]"
+                        />
+                      </td>
+                      <td className="py-2 px-2">
+                        <input
+                          type="number"
+                          value={v.stock}
+                          onChange={(e) => handleUpdateVariant(idx, "stock", e.target.value)}
+                          placeholder="10"
+                          className="w-20 bg-gray-50 border border-gray-200 rounded-lg p-2 font-bold text-center text-xs"
+                        />
+                      </td>
+                      <td className="py-2 px-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVariant(idx)}
+                          className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                          title="Remove variant"
+                        >
+                          <X size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Homepage Section Visibility Card */}

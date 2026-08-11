@@ -138,6 +138,13 @@ export async function POST(req: Request) {
       }
 
       let variant = item.variantId ? variantMap.get(item.variantId) : undefined;
+      if (variant && variant.productId !== item.productId) {
+        return NextResponse.json(
+          { error: `Variant ID ${item.variantId} does not belong to product "${product.name}"` },
+          { status: 400 }
+        );
+      }
+
       if (!variant) {
         variant = defaultVariants.find((v) => v.productId === item.productId);
       }
@@ -149,10 +156,11 @@ export async function POST(req: Request) {
         );
       }
 
-      if (variant.stock < item.quantity) {
+      const availableStock = Math.max(0, variant.stock - (variant.reserved || 0));
+      if (availableStock < item.quantity) {
         return NextResponse.json(
           {
-            error: `Insufficient stock for "${product.name}". Only ${variant.stock} item(s) available, but ${item.quantity} requested.`,
+            error: `Insufficient stock for "${product.name}". Only ${availableStock} item(s) available, but ${item.quantity} requested.`,
           },
           { status: 400 }
         );

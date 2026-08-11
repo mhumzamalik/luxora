@@ -32,6 +32,7 @@ interface ProductVariantData {
   id: string;
   sku: string;
   stock: number;
+  reserved?: number | null;
   price?: number | null;
   size?: string | null;
   color?: string | null;
@@ -114,18 +115,53 @@ export default function ProductDetailPage({
     new Set(variants.map((v) => v.size).filter((s): s is string => Boolean(s)))
   );
 
-  // Find exact selected variant or default to first variant
+  const activeColor = selectedColor || availableColors[0] || null;
+
+  // Helper to calculate available stock (stock - reserved) for a specific size given current active color
+  const getSizeAvailableStock = (size: string, colorCtx: string | null = activeColor) => {
+    const matching = variants.filter((v) => {
+      if (colorCtx && v.color !== colorCtx) return false;
+      if (v.size !== size) return false;
+      return true;
+    });
+    if (matching.length === 0) {
+      const sizeOnly = variants.filter((v) => v.size === size);
+      return sizeOnly.reduce((sum, v) => sum + Math.max(0, v.stock - (v.reserved || 0)), 0);
+    }
+    return matching.reduce((sum, v) => sum + Math.max(0, v.stock - (v.reserved || 0)), 0);
+  };
+
+  // Determine active size (must be in stock for activeColor if possible)
+  const getValidActiveSize = (colorCtx: string | null) => {
+    if (selectedSize && getSizeAvailableStock(selectedSize, colorCtx) > 0) {
+      return selectedSize;
+    }
+    const inStockSize = availableSizes.find((s) => getSizeAvailableStock(s, colorCtx) > 0);
+    return inStockSize || selectedSize || availableSizes[0] || null;
+  };
+
+  const activeSize = getValidActiveSize(activeColor);
+
+  // Find exact selected variant matching active color and size
   const selectedVariant = variants.find((v) => {
-    if (selectedColor && v.color !== selectedColor) return false;
-    if (selectedSize && v.size !== selectedSize) return false;
+    if (activeColor && v.color !== activeColor) return false;
+    if (activeSize && v.size !== activeSize) return false;
     return true;
   }) || variants[0];
 
   const availableStock = selectedVariant
-    ? selectedVariant.stock
-    : variants.reduce((acc, v) => acc + v.stock, 0);
+    ? Math.max(0, selectedVariant.stock - (selectedVariant.reserved || 0))
+    : variants.reduce((acc, v) => acc + Math.max(0, v.stock - (v.reserved || 0)), 0);
 
   const isOutOfStock = availableStock <= 0;
+
+  const handleColorChange = (newColor: string) => {
+    setSelectedColor(newColor);
+    const validSize = getValidActiveSize(newColor);
+    if (validSize) {
+      setSelectedSize(validSize);
+    }
+  };
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -134,7 +170,6 @@ export default function ProductDetailPage({
       return;
     }
 
-    // Check cart item quantity against available stock
     const existingCartItem = cartStore.items.find(
       (item) =>
         item.product.id === product.id &&
@@ -155,12 +190,11 @@ export default function ProductDetailPage({
         id: product.id,
         name: product.name,
         slug: product.slug,
-        // product.price is already the server-resolved effective price (sale or regular)
         price: product.price,
         comparePrice: product.comparePrice,
         image: activeImage,
-        selectedColor: selectedColor || selectedVariant?.color || undefined,
-        selectedSize: selectedSize || selectedVariant?.size || undefined,
+        selectedColor: activeColor || selectedVariant?.color || undefined,
+        selectedSize: activeSize || selectedVariant?.size || undefined,
         variantId: selectedVariant?.id,
       },
       quantity
@@ -359,20 +393,27 @@ export default function ProductDetailPage({
               {availableColors.length > 0 && (
                 <div className="pt-2 space-y-2">
                   <label className="text-xs font-bold text-gray-900 block">
-                    Color: <span className="text-gray-600 font-normal">{selectedColor || availableColors[0]}</span>
+                    Color: <span className="text-gray-600 font-normal">{activeColor}</span>
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {availableColors.map((color) => {
-                      const isSelected = (selectedColor || availableColors[0]) === color;
+                      const colorStock = variants
+                        .filter((v) => v.color === color)
+                        .reduce((sum, v) => sum + Math.max(0, v.stock - (v.reserved || 0)), 0);
+                      const isColorDisabled = colorStock <= 0;
+                      const isSelected = activeColor === color;
                       return (
                         <button
                           key={color}
                           type="button"
-                          onClick={() => setSelectedColor(color)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                          disabled={isColorDisabled}
+                          onClick={() => !isColorDisabled && handleColorChange(color)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
                             isSelected
-                              ? "bg-black text-white border-black"
-                              : "bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-400"
+                              ? "bg-black text-white border-black shadow-xs"
+                              : isColorDisabled
+                              ? "bg-gray-100 text-gray-300 border-gray-200 line-through cursor-not-allowed opacity-60"
+                              : "bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-400 cursor-pointer"
                           }`}
                         >
                           {color}
@@ -387,20 +428,25 @@ export default function ProductDetailPage({
               {availableSizes.length > 0 && (
                 <div className="pt-2 space-y-2">
                   <label className="text-xs font-bold text-gray-900 block">
-                    Size: <span className="text-gray-600 font-normal">{selectedSize || availableSizes[0]}</span>
+                    Size: <span className="text-gray-600 font-normal">{activeSize}</span>
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {availableSizes.map((size) => {
-                      const isSelected = (selectedSize || availableSizes[0]) === size;
+                      const sizeStock = getSizeAvailableStock(size, activeColor);
+                      const isSizeDisabled = sizeStock <= 0;
+                      const isSelected = activeSize === size;
                       return (
                         <button
                           key={size}
                           type="button"
-                          onClick={() => setSelectedSize(size)}
-                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                          disabled={isSizeDisabled}
+                          onClick={() => !isSizeDisabled && setSelectedSize(size)}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition ${
                             isSelected
-                              ? "bg-black text-white border-black"
-                              : "bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-400"
+                              ? "bg-black text-white border-black shadow-xs"
+                              : isSizeDisabled
+                              ? "bg-gray-100 text-gray-300 border-gray-200 line-through cursor-not-allowed opacity-60"
+                              : "bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-400 cursor-pointer"
                           }`}
                         >
                           {size}

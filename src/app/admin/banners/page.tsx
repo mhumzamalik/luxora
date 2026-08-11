@@ -327,22 +327,20 @@ export default function AdminBannersPage() {
                   <button
                     type="button"
                     onClick={() => setImageTab("upload")}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
-                      imageTab === "upload"
+                    className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${imageTab === "upload"
                         ? "bg-purple-600 text-white"
                         : "bg-white border text-gray-600"
-                    }`}
+                      }`}
                   >
                     Upload File
                   </button>
                   <button
                     type="button"
                     onClick={() => setImageTab("url")}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
-                      imageTab === "url"
+                    className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${imageTab === "url"
                         ? "bg-purple-600 text-white"
                         : "bg-white border text-gray-600"
-                    }`}
+                      }`}
                   >
                     Paste URL
                   </button>
@@ -504,11 +502,10 @@ export default function AdminBannersPage() {
 
                 <div className="flex items-center gap-2">
                   <span
-                    className={`text-[10px] font-bold px-3 py-1 rounded-full border ${
-                      b.isActive
+                    className={`text-[10px] font-bold px-3 py-1 rounded-full border ${b.isActive
                         ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                         : "bg-gray-100 text-gray-600 border-gray-200"
-                    }`}
+                      }`}
                   >
                     {b.isActive ? "Active" : "Inactive"}
                   </span>
@@ -548,11 +545,10 @@ export default function AdminBannersPage() {
                       toggleStatusMutation.mutate({ id: b.id, isActive: !b.isActive })
                     }
                     title={b.isActive ? "Deactivate Banner" : "Activate Banner"}
-                    className={`p-2 rounded-xl border transition cursor-pointer ${
-                      b.isActive
+                    className={`p-2 rounded-xl border transition cursor-pointer ${b.isActive
                         ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
                         : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                    }`}
+                      }`}
                   >
                     <Power size={14} />
                   </button>

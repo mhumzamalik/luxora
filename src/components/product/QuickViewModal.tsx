@@ -154,26 +154,28 @@ export function QuickViewModal() {
                 </div>
               )}
 
-              <div>
-                <label className="text-xs font-bold text-gray-800 block mb-1.5">
-                  Size: <span className="font-normal text-gray-600">{selectedSize}</span>
-                </label>
-                <div className="flex space-x-2">
-                  {["XS", "S", "M", "L", "XL"].map((sz) => (
-                    <button
-                      key={sz}
-                      onClick={() => setSelectedSize(sz)}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold border transition ${
-                        selectedSize === sz
-                          ? "bg-black text-white border-black"
-                          : "bg-white text-gray-700 border-gray-200 hover:border-gray-400"
-                      }`}
-                    >
-                      {sz}
-                    </button>
-                  ))}
+              {product.sizes && product.sizes.length > 0 && (
+                <div>
+                  <label className="text-xs font-bold text-gray-800 block mb-1.5">
+                    Size: <span className="font-normal text-gray-600">{selectedSize || product.sizes[0]}</span>
+                  </label>
+                  <div className="flex space-x-2">
+                    {product.sizes.map((sz) => (
+                      <button
+                        key={sz}
+                        onClick={() => setSelectedSize(sz)}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold border transition ${
+                          (selectedSize || product.sizes?.[0]) === sz
+                            ? "bg-black text-white border-black"
+                            : "bg-white text-gray-700 border-gray-200 hover:border-gray-400"
+                        }`}
+                      >
+                        {sz}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Actions */}

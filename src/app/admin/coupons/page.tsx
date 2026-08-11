@@ -375,19 +375,18 @@ export default function AdminCouponsPage() {
                       </td>
                       <td className="p-4">
                         <span
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold border inline-block ${
-                            c.isActive && !isExpired && !isLimitReached
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold border inline-block ${c.isActive && !isExpired && !isLimitReached
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                               : "bg-amber-50 text-amber-700 border-amber-200"
-                          }`}
+                            }`}
                         >
                           {!c.isActive
                             ? "Inactive"
                             : isExpired
-                            ? "Expired"
-                            : isLimitReached
-                            ? "Limit Reached"
-                            : "Active"}
+                              ? "Expired"
+                              : isLimitReached
+                                ? "Limit Reached"
+                                : "Active"}
                         </span>
                       </td>
                       <td className="p-4 text-right">
@@ -397,11 +396,10 @@ export default function AdminCouponsPage() {
                               toggleStatusMutation.mutate({ id: c.id, isActive: !c.isActive })
                             }
                             title={c.isActive ? "Deactivate Coupon" : "Activate Coupon"}
-                            className={`p-1.5 rounded-lg border transition cursor-pointer ${
-                              c.isActive
+                            className={`p-1.5 rounded-lg border transition cursor-pointer ${c.isActive
                                 ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
                                 : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                            }`}
+                              }`}
                           >
                             <Power size={14} />
                           </button>

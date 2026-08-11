@@ -69,6 +69,7 @@ export async function PUT(
       isBestSeller,
       isNewArrival,
       isFlashSale,
+      variants,
     } = body;
 
     const existingProduct = await prisma.product.findUnique({ where: { id } });
@@ -128,8 +129,55 @@ export async function PUT(
         }
       }
 
-      // Update variant stock if provided
-      if (stock !== undefined && stock !== null) {
+      // Update variants if provided
+      if (Array.isArray(variants)) {
+        const existingVariants = await tx.productVariant.findMany({
+          where: { productId: id },
+        });
+        const existingIds = new Set(existingVariants.map((v) => v.id));
+        const incomingIds = new Set(variants.filter((v: any) => v.id).map((v: any) => v.id));
+
+        // Delete variants removed by admin
+        const toDelete = existingVariants.filter((v) => !incomingIds.has(v.id));
+        for (const delVar of toDelete) {
+          try {
+            await tx.productVariant.delete({ where: { id: delVar.id } });
+          } catch {
+            // If referenced by orders, fallback to stock: 0
+            await tx.productVariant.update({
+              where: { id: delVar.id },
+              data: { stock: 0 },
+            });
+          }
+        }
+
+        // Upsert / Update variants
+        for (let idx = 0; idx < variants.length; idx++) {
+          const v = variants[idx];
+          const variantData = {
+            size: v.size ? String(v.size).trim() : null,
+            color: v.color ? String(v.color).trim() : null,
+            colorHex: v.colorHex ? String(v.colorHex).trim() : null,
+            sku: v.sku ? String(v.sku).trim() : `${slug || existingProduct.slug}-${idx + 1}-${Date.now()}`,
+            stock: v.stock !== undefined && v.stock !== null ? Math.max(0, parseInt(String(v.stock), 10) || 0) : 0,
+            price: v.price ? parseFloat(String(v.price)) : null,
+          };
+
+          if (v.id && existingIds.has(v.id)) {
+            await tx.productVariant.update({
+              where: { id: v.id },
+              data: variantData,
+            });
+          } else {
+            await tx.productVariant.create({
+              data: {
+                productId: id,
+                ...variantData,
+              },
+            });
+          }
+        }
+      } else if (stock !== undefined && stock !== null) {
         const primaryVariant = await tx.productVariant.findFirst({
           where: { productId: id },
         });
