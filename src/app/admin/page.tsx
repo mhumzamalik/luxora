@@ -446,6 +446,7 @@ export default function AdminDashboardPage() {
                                 src={prod.image}
                                 alt={prod.name}
                                 fill
+                                sizes="40px"
                                 className="object-contain p-1"
                               />
                             </div>
@@ -527,6 +528,7 @@ export default function AdminDashboardPage() {
                               src={item.image}
                               alt={item.name}
                               fill
+                              sizes="40px"
                               className="object-contain p-1"
                             />
                           </div>

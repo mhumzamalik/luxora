@@ -178,6 +178,7 @@ export function FlashSaleBlock() {
                         src={item.image}
                         alt={item.name}
                         fill
+                        sizes="(max-width: 640px) 45vw, (max-width: 1024px) 22vw, 180px"
                         className={`object-contain p-2 transition duration-300 ${isOutOfStock ? "opacity-60 grayscale" : ""}`}
                       />
                     </Link>

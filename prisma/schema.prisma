@@ -110,6 +110,10 @@ model Product {
   reviews        Review[]
   wishlistItems  WishlistItem[]
 
+  // Homepage query indexes
+  @@index([isBestSeller, updatedAt(sort: Desc)])
+  @@index([isNewArrival, createdAt(sort: Desc)])
+  @@index([categoryId])
   @@map("products")
 }
 
@@ -121,6 +125,7 @@ model ProductImage {
   isPrimary Boolean @default(false) @map("is_primary")
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  @@index([productId, isPrimary])
   @@map("product_images")
 }
 
@@ -296,6 +301,8 @@ model FlashSale {
   updatedAt DateTime        @updatedAt @map("updated_at")
   items     FlashSaleItem[]
 
+  // Efficiently find currently-active flash sales
+  @@index([isActive, startDate, endDate])
   @@map("flash_sales")
 }
 

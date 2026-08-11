@@ -73,6 +73,7 @@ export function QuickViewModal() {
               src={product.images[0]}
               alt={product.name}
               fill
+              sizes="(max-width: 768px) 100vw, 384px"
               className="object-contain p-6"
             />
           </div>

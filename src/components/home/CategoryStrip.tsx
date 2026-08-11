@@ -60,6 +60,7 @@ export function CategoryStrip() {
                 src={cat.image}
                 alt={cat.name}
                 fill
+                sizes="(max-width: 640px) 64px, (max-width: 768px) 80px, 88px"
                 className="object-cover rounded-xl"
               />
             </div>

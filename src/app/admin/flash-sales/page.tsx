@@ -342,7 +342,7 @@ export default function AdminFlashSalesPage() {
                           return (
                             <div key={item.id || item.productId} className="bg-gray-50/80 border border-gray-200/80 p-3 rounded-2xl flex items-center space-x-3">
                               <div className="relative w-12 h-12 bg-white rounded-xl overflow-hidden shrink-0 border border-gray-100">
-                                <Image src={primaryImg} alt={prod?.name || "Product"} fill className="object-contain p-1" />
+                                <Image src={primaryImg} alt={prod?.name || "Product"} fill sizes="48px" className="object-contain p-1" />
                               </div>
                               <div className="min-w-0 flex-1">
                                 <h4 className="text-xs font-bold text-gray-900 truncate">{prod?.name || "Product"}</h4>
@@ -463,7 +463,7 @@ export default function AdminFlashSalesPage() {
                         <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-200/80">
                           <div className="flex items-center space-x-3 min-w-0">
                             <div className="relative w-10 h-10 bg-white border border-gray-100 rounded-xl overflow-hidden shrink-0">
-                              <Image src={primaryImg} alt={prod?.name || "Product"} fill className="object-contain p-1" />
+                              <Image src={primaryImg} alt={prod?.name || "Product"} fill sizes="48px" className="object-contain p-1" />
                             </div>
                             <div className="min-w-0">
                               <h4 className="text-xs font-bold text-gray-900 truncate">{prod?.name}</h4>
@@ -597,7 +597,7 @@ export default function AdminFlashSalesPage() {
                         </button>
 
                         <div className="relative w-10 h-10 bg-white border border-gray-100 rounded-xl overflow-hidden shrink-0">
-                          <Image src={primaryImg} alt={prod.name} fill className="object-contain p-1" />
+                          <Image src={primaryImg} alt={prod.name} fill sizes="48px" className="object-contain p-1" />
                         </div>
 
                         <div className="min-w-0">

@@ -260,6 +260,7 @@ export default function ProductDetailPage({
                   alt={product.name}
                   fill
                   priority
+                  sizes="(max-width: 1024px) 100vw, 700px"
                   className="object-contain p-8 transition-transform duration-500 group-hover:scale-110"
                 />
               ) : (
@@ -275,7 +276,7 @@ export default function ProductDetailPage({
                     activeImageIndex === idx ? "border-black" : "border-transparent"
                   }`}
                 >
-                  {img && <Image src={img} alt="Thumbnail" fill className="object-contain p-2" />}
+                  {img && <Image src={img} alt="Thumbnail" fill sizes="80px" className="object-contain p-2" />}
                 </button>
               ))}
             </div>

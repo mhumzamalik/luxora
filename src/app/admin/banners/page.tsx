@@ -381,7 +381,7 @@ export default function AdminBannersPage() {
               {/* Preview */}
               {imageUrl && (
                 <div className="relative w-full h-36 bg-gray-200 rounded-xl overflow-hidden border border-gray-300">
-                  <Image src={imageUrl} alt="Preview" fill className="object-cover" />
+                  <Image src={imageUrl} alt="Preview" fill sizes="(max-width: 768px) 100vw, 600px" className="object-cover" />
                 </div>
               )}
             </div>
@@ -520,7 +520,7 @@ export default function AdminBannersPage() {
 
               {/* Banner Image Preview */}
               <div className="relative w-full h-48 rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 group">
-                <Image src={b.imageUrl} alt={b.title} fill className="object-cover" />
+                <Image src={b.imageUrl} alt={b.title} fill sizes="(max-width: 768px) 100vw, 800px" className="object-cover" />
                 {b.linkUrl && (
                   <a
                     href={b.linkUrl}

@@ -265,7 +265,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               >
                 <div className="relative w-8 h-8 rounded-full overflow-hidden bg-purple-100 border border-purple-200 flex items-center justify-center shrink-0">
                   {session?.user?.image ? (
-                    <Image src={session.user.image} alt="Admin Avatar" fill className="object-cover" />
+                    <Image src={session.user.image} alt="Admin Avatar" fill sizes="32px" className="object-cover" />
                   ) : (
                     <span className="text-xs font-bold text-purple-700">
                       {session?.user?.name ? session.user.name[0].toUpperCase() : "A"}

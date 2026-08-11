@@ -31,6 +31,7 @@ export function InstagramGrid() {
               src={img}
               alt={`Luxora Instagram Post ${idx + 1}`}
               fill
+              sizes="(max-width: 640px) 45vw, (max-width: 1024px) 24vw, 12vw"
               className="object-cover group-hover:scale-110 transition duration-500"
             />
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">

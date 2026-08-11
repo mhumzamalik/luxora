@@ -65,6 +65,7 @@ export function Testimonials() {
                   src={rev.avatar}
                   alt={rev.name}
                   fill
+                  sizes="44px"
                   className="object-cover"
                 />
               </div>

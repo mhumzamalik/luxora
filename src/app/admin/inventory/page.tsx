@@ -123,7 +123,7 @@ export default function AdminInventoryPage() {
                     <td className="p-4">
                       <div className="flex items-center space-x-3">
                         <div className="relative w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden shrink-0">
-                          <Image src={primaryImg} alt={varItem.product.name} fill className="object-contain p-1" />
+                          <Image src={primaryImg} alt={varItem.product.name} fill sizes="40px" className="object-contain p-1" />
                         </div>
                         <div>
                           <span className="font-bold text-gray-900 block leading-tight">{varItem.product.name}</span>

@@ -145,6 +145,7 @@ export function BestSellersGrid() {
                       src={primaryImg}
                       alt={product.name}
                       fill
+                      sizes="(max-width: 768px) 220px, 250px"
                       className="object-contain p-3 group-hover:scale-105 transition-transform duration-300"
                     />
                   </Link>
