@@ -114,6 +114,8 @@ model Product {
   @@index([isBestSeller, updatedAt(sort: Desc)])
   @@index([isNewArrival, createdAt(sort: Desc)])
   @@index([categoryId])
+  @@index([price])
+  @@index([createdAt(sort: Desc)])
   @@map("products")
 }
 

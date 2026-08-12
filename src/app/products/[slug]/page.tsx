@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, use } from "react";
+import React, { useState, useEffect, use, startTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { QuickViewModal } from "@/components/product/QuickViewModal";
-import { Zap } from "lucide-react";
+import { Zap, Clock } from "lucide-react";
 import { Star, ShoppingBag, Heart, ShieldCheck, Truck, RotateCcw, Send } from "lucide-react";
 import { useCartStore } from "@/store/cart-store";
 import { useWishlistStore } from "@/store/wishlist-store";
@@ -72,6 +72,18 @@ interface ProductDetailData {
   }[];
 }
 
+interface RecentlyViewedItem {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  comparePrice?: number | null;
+  badge?: string | null;
+  rating: number;
+  reviewCount: number;
+  image: string;
+}
+
 export default function ProductDetailPage({
   params,
 }: {
@@ -87,6 +99,7 @@ export default function ProductDetailPage({
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedItem[]>([]);
 
   // Review Form state
   const [reviewRating, setReviewRating] = useState(5);
@@ -105,6 +118,41 @@ export default function ProductDetailPage({
   const images: string[] = orderedImageList.map((img) => img.url);
   const activeImage = images[activeImageIndex] || images[0];
   const isWishlisted = product ? wishlistStore.isInWishlist(product.id) : false;
+
+  // Handle recently viewed items persistence
+  useEffect(() => {
+    if (!product) return;
+
+    let nextList: RecentlyViewedItem[] = [];
+    try {
+      const stored = localStorage.getItem("luxora_recently_viewed");
+      let list: RecentlyViewedItem[] = stored ? JSON.parse(stored) : [];
+
+      const currentItem: RecentlyViewedItem = {
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        price: product.price,
+        comparePrice: product.comparePrice,
+        badge: product.badge,
+        rating: product.rating,
+        reviewCount: product.reviewCount,
+        image: activeImage || "/placeholder.jpg",
+      };
+
+      // Deduplicate and limit to 6 entries
+      list = [currentItem, ...list.filter((item) => item.id !== product.id)].slice(0, 6);
+      localStorage.setItem("luxora_recently_viewed", JSON.stringify(list));
+      nextList = list.filter((item) => item.id !== product.id);
+    } catch {
+      // Ignore localStorage errors
+    }
+
+    startTransition(() => {
+      setRecentlyViewed(nextList);
+    });
+  }, [product, activeImage]);
+
 
   // Determine available variants, color/size options, and active variant stock
   const variants = product?.variants || [];
@@ -610,6 +658,36 @@ export default function ProductDetailPage({
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
               {relatedProducts.map((relProduct) => (
                 <ProductCard key={relProduct.id} product={relProduct} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Recently Viewed Products Section */}
+        {recentlyViewed.length > 0 && (
+          <section className="space-y-6 pt-4 border-t border-gray-200">
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-gray-700" />
+              <h2 className="text-xl font-serif font-bold text-gray-900">
+                Recently Viewed Items
+              </h2>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+              {recentlyViewed.map((item) => (
+                <ProductCard
+                  key={item.id}
+                  product={{
+                    id: item.id,
+                    name: item.name,
+                    slug: item.slug,
+                    price: item.price,
+                    comparePrice: item.comparePrice,
+                    badge: item.badge,
+                    rating: item.rating,
+                    reviewCount: item.reviewCount,
+                    images: [{ url: item.image, isPrimary: true }],
+                  }}
+                />
               ))}
             </div>
           </section>

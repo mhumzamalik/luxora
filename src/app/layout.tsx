@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import { AIShoppingAssistantWidget } from "@/components/ai/AIShoppingAssistantWidget";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,6 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <QueryProvider>
             <ToastProvider>
               {children}
+              <AIShoppingAssistantWidget />
             </ToastProvider>
           </QueryProvider>
         </AuthProvider>
