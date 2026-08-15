@@ -340,6 +340,20 @@ model Banner {
   @@map("banners")
 }
 
+model BankSetting {
+  id            String   @id @default("default")
+  bankName      String   @default("Meezan Bank Ltd") @map("bank_name")
+  accountTitle  String   @default("LUXORA ENTERPRISE") @map("account_title")
+  accountNumber String?  @map("account_number")
+  iban          String   @default("PK36MEZN0001234567890101")
+  branchCode    String?  @map("branch_code")
+  instructions  String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("bank_settings")
+}
+
 enum Role {
   CUSTOMER
   MANAGER
@@ -368,3 +382,4 @@ enum PaymentMethod {
   PAYPAL
   COD
 }
+

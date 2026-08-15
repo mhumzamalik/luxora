@@ -6,7 +6,7 @@ import Image from "next/image";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
-import { useCartStore } from "@/store/cart-store";
+import { useCartStore, useCartHydrated } from "@/store/cart-store";
 import { formatCurrency } from "@/lib/currency";
 import { ShoppingBag, Trash2, Plus, Minus, ArrowRight, Truck, Tag, Lock } from "lucide-react";
 
@@ -14,11 +14,19 @@ import { useToast } from "@/components/ui/ToastProvider";
 
 export default function CartPage() {
   const cartStore = useCartStore();
+  const isHydrated = useCartHydrated();
   const { success: toastSuccess } = useToast();
   const [couponInput, setCouponInput] = useState("");
   const [couponError, setCouponError] = useState("");
 
-  const subtotal = cartStore.getSubtotal();
+  const items = isHydrated ? cartStore.items : [];
+  const itemCount = isHydrated ? cartStore.getItemCount() : 0;
+  const subtotal = isHydrated ? cartStore.getSubtotal() : 0;
+  const discount = isHydrated ? cartStore.getDiscountAmount() : 0;
+  const shipping = isHydrated ? cartStore.getShippingFee() : 0;
+  const total = isHydrated ? cartStore.getTotal() : 0;
+  const couponCode = isHydrated ? cartStore.couponCode : null;
+
   const freeShippingThreshold = 150;
   const amountToFreeShipping = Math.max(0, freeShippingThreshold - subtotal);
   const progressPercent = Math.min(100, (subtotal / freeShippingThreshold) * 100);
@@ -67,9 +75,9 @@ export default function CartPage() {
 
         <div className="flex items-center justify-between border-b border-gray-100 pb-4">
           <h1 className="text-3xl font-serif font-bold text-gray-900 flex items-center gap-3">
-            <ShoppingBag size={28} /> Shopping Bag ({cartStore.getItemCount()})
+            <ShoppingBag size={28} /> Shopping Bag ({itemCount})
           </h1>
-          {cartStore.items.length > 0 && (
+          {items.length > 0 && (
             <button
               onClick={() => cartStore.clearCart()}
               className="text-xs text-red-500 font-semibold hover:underline cursor-pointer"
@@ -79,7 +87,7 @@ export default function CartPage() {
           )}
         </div>
 
-        {cartStore.items.length === 0 ? (
+        {items.length === 0 ? (
           <div className="bg-white p-12 rounded-3xl border border-gray-100 text-center space-y-4 max-w-md mx-auto my-12 shadow-2xs">
             <div className="w-16 h-16 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center mx-auto">
               <ShoppingBag size={32} />
@@ -125,8 +133,8 @@ export default function CartPage() {
 
               {/* Items Card List */}
               <div className="bg-white rounded-3xl border border-gray-100 p-6 space-y-4 divide-y divide-gray-100 shadow-2xs">
-                {cartStore.items.map((item, idx) => (
-                  <div key={idx} className="pt-4 first:pt-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                {items.map((item, idx) => (
+                  <div key={`${item.product.id}-${item.product.variantId || idx}`} className="pt-4 first:pt-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center space-x-4">
                       <div className="relative w-20 h-20 bg-gray-50 rounded-xl overflow-hidden shrink-0 border border-gray-100">
                         <Image
@@ -226,15 +234,16 @@ export default function CartPage() {
                   </div>
                   <button
                     type="submit"
-                    className="bg-gray-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-black transition cursor-pointer"
+                    disabled={isValidatingCoupon || !couponInput.trim()}
+                    className="bg-gray-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-black transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Apply
                   </button>
                 </div>
                 {couponError && <p className="text-[11px] text-red-500">{couponError}</p>}
-                {cartStore.couponCode && (
+                {couponCode && (
                   <p className="text-[11px] text-emerald-600 font-semibold flex items-center justify-between">
-                    <span>Code {cartStore.couponCode} applied ({cartStore.discountPercentage}% OFF)</span>
+                    <span>Code {couponCode} applied ({cartStore.discountPercentage}% OFF)</span>
                     <button
                       type="button"
                       onClick={() => cartStore.removeCoupon()}
@@ -252,21 +261,21 @@ export default function CartPage() {
                   <span>Subtotal</span>
                   <span className="font-semibold text-gray-900">{formatCurrency(subtotal)}</span>
                 </div>
-                {cartStore.getDiscountAmount() > 0 && (
+                {discount > 0 && (
                   <div className="flex justify-between text-emerald-600 font-semibold">
                     <span>Discount</span>
-                    <span>-{formatCurrency(cartStore.getDiscountAmount())}</span>
+                    <span>-{formatCurrency(discount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between">
                   <span>Shipping</span>
                   <span className="font-semibold text-gray-900">
-                    {cartStore.getShippingFee() === 0 ? "FREE" : formatCurrency(cartStore.getShippingFee())}
+                    {shipping === 0 ? "FREE" : formatCurrency(shipping)}
                   </span>
                 </div>
                 <div className="flex justify-between text-base font-extrabold text-gray-900 pt-3 border-t border-gray-100">
                   <span>Total</span>
-                  <span>{formatCurrency(cartStore.getTotal())}</span>
+                  <span>{formatCurrency(total)}</span>
                 </div>
               </div>
 
@@ -276,7 +285,7 @@ export default function CartPage() {
                 className="w-full bg-black hover:bg-gray-800 text-white text-xs font-bold py-4 rounded-2xl shadow-xl transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Lock size={15} />
-                <span>Proceed to Checkout — {formatCurrency(cartStore.getTotal())}</span>
+                <span>Proceed to Checkout — {formatCurrency(total)}</span>
                 <ArrowRight size={15} />
               </Link>
             </div>

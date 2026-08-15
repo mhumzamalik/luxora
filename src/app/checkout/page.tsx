@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { useCartStore } from "@/store/cart-store";
+import { useCartStore, useCartHydrated } from "@/store/cart-store";
 import {
   Landmark,
   Lock,
@@ -19,21 +19,47 @@ import {
   Ticket,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api-client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { formatCurrency } from "@/lib/currency";
 
 type PaymentMethodType = "BANK_TRANSFER" | "COD";
 
+interface AvailableCoupon {
+  id: string;
+  code: string;
+  discountType: "PERCENTAGE" | "FIXED";
+  discountValue: number;
+  maxDiscount?: number | null;
+  minOrderAmount?: number | null;
+}
+
+interface BankDetails {
+  bankName: string;
+  accountTitle: string;
+  accountNumber?: string | null;
+  iban: string;
+  branchCode?: string | null;
+  instructions?: string | null;
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const cartStore = useCartStore();
+  const isHydrated = useCartHydrated();
   const { error: toastError, success: toastSuccess } = useToast();
 
+  const { data: bankDetails, isLoading: isLoadingBank } = useQuery<BankDetails>({
+    queryKey: ["bank-details"],
+    queryFn: () => fetchApi<BankDetails>("/api/bank-details"),
+    staleTime: 1000 * 30,
+  });
+
   const [formData, setFormData] = useState({
-    fullName: session?.user?.name || "",
-    email: session?.user?.email || "",
+    fullName: "",
+    email: "",
     street: "",
     city: "",
     state: "",
@@ -54,19 +80,23 @@ export default function CheckoutPage() {
   const [couponInput, setCouponInput] = useState("");
   const [couponError, setCouponError] = useState("");
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
-  const [availableCoupons, setAvailableCoupons] = useState<any[]>([]);
+  const [availableCoupons, setAvailableCoupons] = useState<AvailableCoupon[]>([]);
 
-  const subtotal = cartStore.getSubtotal();
-  const discount = cartStore.getDiscountAmount();
-  const shipping = cartStore.getShippingFee();
-  const total = cartStore.getTotal();
+  // Hydration-safe derived cart values (empty on SSR / initial hydration pass, populated immediately on client post-hydration)
+  const items = isHydrated ? cartStore.items : [];
+  const itemCount = isHydrated ? cartStore.getItemCount() : 0;
+  const subtotal = isHydrated ? cartStore.getSubtotal() : 0;
+  const discount = isHydrated ? cartStore.getDiscountAmount() : 0;
+  const shipping = isHydrated ? cartStore.getShippingFee() : 0;
+  const total = isHydrated ? cartStore.getTotal() : 0;
+  const couponCode = isHydrated ? cartStore.couponCode : null;
+  const coupon = isHydrated ? cartStore.coupon : null;
+
+  const validAvailableCoupons = subtotal > 0 ? availableCoupons : [];
 
   // Fetch available coupons dynamically when subtotal changes
   useEffect(() => {
-    if (subtotal <= 0) {
-      setAvailableCoupons([]);
-      return;
-    }
+    if (subtotal <= 0) return;
     let isMounted = true;
     fetch(`/api/coupons/available?subtotal=${subtotal}`)
       .then((res) => res.json())
@@ -202,7 +232,7 @@ export default function CheckoutPage() {
           unitPrice: item.product.price,
         })),
         shippingAddress: {
-          fullName: formData.fullName,
+          fullName: formData.fullName || session?.user?.name || "",
           street: formData.street,
           city: formData.city,
           state: formData.state,
@@ -216,7 +246,7 @@ export default function CheckoutPage() {
             ? paymentProofUrl
             : undefined,
         couponCode: cartStore.couponCode || undefined,
-        guestEmail: session?.user ? undefined : formData.email,
+        guestEmail: session?.user ? undefined : (formData.email || undefined),
         notes: formData.notes || undefined,
       };
 
@@ -272,7 +302,7 @@ export default function CheckoutPage() {
                   <input
                     type="text"
                     required
-                    value={formData.fullName}
+                    value={formData.fullName || session?.user?.name || ""}
                     onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                     placeholder="Muhammad Hamza"
                     className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl p-3 outline-hidden focus:border-purple-600"
@@ -435,22 +465,46 @@ export default function CheckoutPage() {
                     <div className="font-bold text-purple-200 uppercase tracking-widest text-[10px]">
                       LUXORA Official Bank Account
                     </div>
-                    <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-[11px]">
-                      <div>
-                        <span className="text-purple-300 block text-[9px]">Bank Name</span>
-                        <span className="font-bold">Meezan Bank Ltd</span>
+                    {isLoadingBank ? (
+                      <div className="flex items-center justify-center p-4 text-purple-200 gap-2">
+                        <Loader2 size={16} className="animate-spin text-purple-300" />
+                        <span>Loading Official Bank Account Details...</span>
                       </div>
-                      <div>
-                        <span className="text-purple-300 block text-[9px]">Account Title</span>
-                        <span className="font-bold">LUXORA ENTERPRISE</span>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-[11px]">
+                        <div>
+                          <span className="text-purple-300 block text-[9px]">Bank Name</span>
+                          <span className="font-bold">{bankDetails?.bankName || "Meezan Bank Ltd"}</span>
+                        </div>
+                        <div>
+                          <span className="text-purple-300 block text-[9px]">Account Title</span>
+                          <span className="font-bold">{bankDetails?.accountTitle || "LUXORA ENTERPRISE"}</span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-purple-300 block text-[9px]">IBAN Number</span>
+                          <span className="font-bold text-amber-300 text-xs">
+                            {bankDetails?.iban || "PK36MEZN0001234567890101"}
+                          </span>
+                        </div>
+                        {bankDetails?.accountNumber && (
+                          <div>
+                            <span className="text-purple-300 block text-[9px]">Account Number</span>
+                            <span className="font-bold">{bankDetails.accountNumber}</span>
+                          </div>
+                        )}
+                        {bankDetails?.branchCode && (
+                          <div className={bankDetails?.accountNumber ? "" : "col-span-2"}>
+                            <span className="text-purple-300 block text-[9px]">Branch / SWIFT Code</span>
+                            <span className="font-bold">{bankDetails.branchCode}</span>
+                          </div>
+                        )}
                       </div>
-                      <div className="col-span-2">
-                        <span className="text-purple-300 block text-[9px]">IBAN Number</span>
-                        <span className="font-bold text-amber-300 text-xs">
-                          PK36MEZN0001234567890101
-                        </span>
+                    )}
+                    {bankDetails?.instructions && (
+                      <div className="pt-1 text-[10px] text-purple-200/90 border-t border-purple-800/80">
+                        {bankDetails.instructions}
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -546,13 +600,13 @@ export default function CheckoutPage() {
           {/* Order Summary Sidebar */}
           <div className="lg:col-span-5 bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-2xs h-fit space-y-6">
             <h3 className="text-base font-serif font-bold text-gray-900 border-b border-gray-100 pb-3">
-              Order Summary ({cartStore.getItemCount()} items)
+              Order Summary ({itemCount} items)
             </h3>
 
             {/* Cart Items List */}
             <div className="space-y-3 max-h-72 overflow-y-auto divide-y divide-gray-100 pr-1">
-              {cartStore.items.map((item, idx) => (
-                <div key={idx} className="pt-3 first:pt-0 flex items-center space-x-3">
+              {items.map((item, idx) => (
+                <div key={`${item.product.id}-${item.product.variantId || idx}`} className="pt-3 first:pt-0 flex items-center space-x-3">
                   <div className="relative w-14 h-14 bg-gray-50 rounded-xl overflow-hidden shrink-0 border border-gray-100">
                     <Image
                       src={item.product.image}
@@ -574,7 +628,7 @@ export default function CheckoutPage() {
             </div>
 
             {/* ── Coupon Application Section ── */}
-            {cartStore.couponCode ? (
+            {couponCode ? (
               /* Applied Coupon Box */
               <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-xs space-y-1.5 animate-in fade-in">
                 <div className="flex items-center justify-between">
@@ -592,10 +646,10 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between items-baseline pt-1">
                   <span className="font-mono font-extrabold text-emerald-700">
-                    {cartStore.couponCode}
-                    {cartStore.coupon?.discountType === "PERCENTAGE"
-                      ? ` (${cartStore.coupon.discountValue}% OFF)`
-                      : ` (${formatCurrency(cartStore.coupon?.discountValue || 0)} OFF)`}
+                    {couponCode}
+                    {coupon?.discountType === "PERCENTAGE"
+                      ? ` (${coupon.discountValue}% OFF)`
+                      : ` (${formatCurrency(coupon?.discountValue || 0)} OFF)`}
                   </span>
                   <span className="font-extrabold text-emerald-700">
                     -{formatCurrency(discount)}
@@ -640,13 +694,13 @@ export default function CheckoutPage() {
             )}
 
             {/* ── Suggested / Available Coupons ── */}
-            {!cartStore.couponCode && availableCoupons.length > 0 && (
+            {!couponCode && validAvailableCoupons.length > 0 && (
               <div className="space-y-2 pt-2 border-t border-gray-100">
                 <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider block">
                   Available Coupons
                 </span>
                 <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
-                  {availableCoupons.map((ac) => (
+                  {validAvailableCoupons.map((ac) => (
                     <div
                       key={ac.id}
                       className="bg-purple-50/60 border border-purple-100 rounded-xl p-2.5 flex items-center justify-between text-xs"
@@ -687,7 +741,7 @@ export default function CheckoutPage() {
 
               {discount > 0 && (
                 <div className="flex justify-between text-emerald-600 font-semibold">
-                  <span>Discount ({cartStore.couponCode})</span>
+                  <span>Discount ({couponCode})</span>
                   <span>-{formatCurrency(discount)}</span>
                 </div>
               )}
@@ -725,3 +779,4 @@ export default function CheckoutPage() {
     </div>
   );
 }
+

@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -32,6 +33,8 @@ interface CartStore {
   coupon: AppliedCoupon | null;
   couponCode: string | null; // legacy backward compatibility
   discountPercentage: number; // legacy backward compatibility
+  _hasHydrated: boolean;
+  setHasHydrated: (hasHydrated: boolean) => void;
 
   openCart: () => void;
   closeCart: () => void;
@@ -57,6 +60,9 @@ export const useCartStore = create<CartStore>()(
       coupon: null,
       couponCode: null,
       discountPercentage: 0,
+      _hasHydrated: false,
+
+      setHasHydrated: (state: boolean) => set({ _hasHydrated: state }),
 
       openCart: () => set({ isOpen: true }),
       closeCart: () => set({ isOpen: false }),
@@ -177,6 +183,36 @@ export const useCartStore = create<CartStore>()(
     }),
     {
       name: "luxora-cart-storage",
+      onRehydrateStorage: () => {
+        return (state) => {
+          state?.setHasHydrated(true);
+        };
+      },
+      partialize: (state) => ({
+        items: state.items,
+        coupon: state.coupon,
+        couponCode: state.couponCode,
+        discountPercentage: state.discountPercentage,
+      }),
     }
   )
 );
+
+/**
+ * Hydration hook for Zustand cart store.
+ * Returns `false` on SSR and during initial client hydration pass to prevent hydration mismatches,
+ * and immediately switches to `true` once persisted cart data has hydrated on the client.
+ */
+export function useCartHydrated(): boolean {
+  return useSyncExternalStore(
+    (callback) => {
+      const unsub = useCartStore.persist.onFinishHydration(() => {
+        callback();
+      });
+      return unsub;
+    },
+    () => useCartStore.persist.hasHydrated(),
+    () => false
+  );
+}
+
