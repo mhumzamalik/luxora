@@ -12,7 +12,7 @@ const globalForPrisma = globalThis as unknown as {
  * Falls back safely to DATABASE_URL if DIRECT_URL is not set.
  */
 function getOptimalDatabaseUrl(): string | undefined {
-  const rawUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
+  const rawUrl = process.env.DATABASE_URL;
   if (!rawUrl) return undefined;
 
   // When connecting via port 5432, tune connection pool parameters if not already present
