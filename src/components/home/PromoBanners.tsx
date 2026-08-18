@@ -44,11 +44,17 @@ const defaultPromos = [
   },
 ];
 
+interface HomepageData {
+  promoBanners?: DBBanner[];
+}
+
 export function PromoBanners() {
-  const { data: dbBanners = [] } = useQuery<DBBanner[]>({
-    queryKey: ["banners", "promo"],
-    queryFn: () => fetchApi("/api/banners?type=PROMO"),
+  const { data } = useQuery<HomepageData>({
+    queryKey: ["homepage"],
+    queryFn: () => fetchApi("/api/homepage"),
   });
+
+  const dbBanners = data?.promoBanners || [];
 
   const promos =
     dbBanners.length > 0

@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { z } from "zod";
+
 
 const resetSchema = z.object({
   email: z.string().email(),
   token: z.string().min(1),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 export async function POST(req: Request) {
@@ -24,11 +26,17 @@ export async function POST(req: Request) {
     const { email, token, password } = parsed.data;
     const normalizedEmail = email.toLowerCase().trim();
 
+    // Hash the received raw token to compare against the stored hash.
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+
     const verificationToken = await prisma.verificationToken.findUnique({
       where: {
         identifier_token: {
           identifier: normalizedEmail,
-          token,
+          token: hashedToken,
         },
       },
     });
@@ -40,7 +48,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 12);
 
     await prisma.user.update({
       where: { email: normalizedEmail },
@@ -51,7 +59,7 @@ export async function POST(req: Request) {
       where: {
         identifier_token: {
           identifier: normalizedEmail,
-          token,
+          token: hashedToken,
         },
       },
     });

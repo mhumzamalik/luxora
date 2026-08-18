@@ -145,6 +145,7 @@ model ProductVariant {
   orderItems OrderItem[]
   product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  @@index([productId])
   @@map("product_variants")
 }
 
@@ -261,6 +262,7 @@ model Review {
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([productId, createdAt(sort: Desc)])
   @@map("reviews")
 }
 
@@ -317,6 +319,7 @@ model FlashSaleItem {
   product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([flashSaleId, productId])
+  @@index([productId])
   @@map("flash_sale_items")
 }
 
@@ -337,6 +340,8 @@ model Banner {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
+  @@index([isActive, type, position])
+  @@index([isActive, startDate, endDate])
   @@map("banners")
 }
 

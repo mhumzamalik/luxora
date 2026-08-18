@@ -9,7 +9,7 @@ import { sendVerificationEmail } from "@/lib/resend";
 const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 export async function POST(req: Request) {
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
         );
       }
       // Unverified existing user: update credentials and resend verification email
-      const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash(password, 12);
       user = await prisma.user.update({
         where: { id: existingUser.id },
         data: { name, passwordHash },
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
         },
       });
     } else {
-      const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash(password, 12);
       user = await prisma.user.create({
         data: {
           name,

@@ -2,6 +2,18 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getAdminSupabaseClient } from "@/lib/supabase-admin";
 
+// H-4: only these buckets may be written to via this endpoint
+const ALLOWED_BUCKETS = new Set(["products", "payment-proofs"]);
+
+// M-4: map validated MIME type to a safe extension (never trust the filename)
+const MIME_TO_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "application/pdf": "pdf",
+};
+
 export async function POST(req: Request) {
   try {
     const session = await auth();
@@ -11,7 +23,16 @@ export async function POST(req: Request) {
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
-    const bucket = (formData.get("bucket") as string) || "uploads";
+
+    // H-4: validate bucket against allowlist — do NOT trust user-supplied value blindly
+    const rawBucket = formData.get("bucket") as string | null;
+    if (!rawBucket || !ALLOWED_BUCKETS.has(rawBucket)) {
+      return NextResponse.json(
+        { error: "Invalid or missing bucket. Allowed: products, payment-proofs." },
+        { status: 400 }
+      );
+    }
+    const bucket = rawBucket;
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
@@ -36,7 +57,8 @@ export async function POST(req: Request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    // M-4: derive extension from the validated MIME type, never from the user-supplied filename
+    const fileExt = MIME_TO_EXT[file.type] ?? "bin";
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
     // Store under the authenticated user's folder so paths are scoped
     const storagePath = `${session.user.id}/${fileName}`;

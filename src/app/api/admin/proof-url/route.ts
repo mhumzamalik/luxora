@@ -36,6 +36,16 @@ export async function GET(req: Request) {
       );
     }
 
+    // M-5: validate path format to prevent traversal to other buckets.
+    // Expected format: <userId>/<filename> (alphanumeric, dashes, underscores, dots only)
+    const SAFE_PATH_REGEX = /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/;
+    if (!SAFE_PATH_REGEX.test(storagePath)) {
+      return NextResponse.json(
+        { error: "Invalid path format." },
+        { status: 400 }
+      );
+    }
+
     const adminClient = getAdminSupabaseClient();
 
     const { data, error } = await adminClient.storage

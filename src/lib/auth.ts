@@ -5,6 +5,8 @@ import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/lib/auth.config";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { headers } from "next/headers";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -23,6 +25,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
           return null;
+        }
+
+        // M-2: rate-limit login attempts per IP (10 per minute)
+        // Note: headers() is available in Server Actions / Route Handlers context.
+        // In the authorize callback we use a try/catch as a safeguard.
+        try {
+          const headersList = await headers();
+          const ip =
+            headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+            "login-ip";
+          const rateCheck = checkRateLimit(`login:${ip}`, 10, 60 * 1000);
+          if (!rateCheck.success) {
+            throw new Error("Too many login attempts. Please try again later.");
+          }
+        } catch (rateErr: unknown) {
+          // Re-throw rate limit errors; swallow header-access errors gracefully
+          if (
+            rateErr instanceof Error &&
+            rateErr.message.startsWith("Too many login")
+          ) {
+            throw rateErr;
+          }
         }
 
         const email = (credentials.email as string).toLowerCase().trim();

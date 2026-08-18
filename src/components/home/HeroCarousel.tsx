@@ -55,13 +55,19 @@ const defaultSlides = [
   },
 ];
 
+interface HomepageData {
+  heroBanners?: DBBanner[];
+}
+
 export function HeroCarousel() {
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  const { data: dbBanners = [] } = useQuery<DBBanner[]>({
-    queryKey: ["banners", "hero"],
-    queryFn: () => fetchApi("/api/banners?type=HERO"),
+  const { data } = useQuery<HomepageData>({
+    queryKey: ["homepage"],
+    queryFn: () => fetchApi("/api/homepage"),
   });
+
+  const dbBanners = data?.heroBanners || [];
 
   const activeSlides =
     dbBanners.length > 0

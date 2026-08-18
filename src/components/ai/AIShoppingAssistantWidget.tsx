@@ -184,6 +184,7 @@ export function AIShoppingAssistantWidget() {
                                 src={primaryImg}
                                 alt={product.name}
                                 fill
+                                sizes="120px"
                                 className="object-cover group-hover:scale-105 transition-transform duration-300"
                               />
                             </Link>

@@ -8,7 +8,7 @@ const updateProfileSchema = z.object({
   name: z.string().min(2).optional(),
   image: z.string().optional(),
   currentPassword: z.string().optional(),
-  newPassword: z.string().min(6).optional(),
+  newPassword: z.string().min(8).optional(),
 });
 
 export async function GET() {
@@ -95,7 +95,7 @@ export async function PATCH(req: Request) {
         );
       }
 
-      updateData.passwordHash = await bcrypt.hash(newPassword, 10);
+      updateData.passwordHash = await bcrypt.hash(newPassword, 12);
     }
 
     const updatedUser = await prisma.user.update({

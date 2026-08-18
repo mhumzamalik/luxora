@@ -40,22 +40,29 @@ export async function POST(req: Request) {
       });
     }
 
-    const resetToken = crypto.randomBytes(32).toString("hex");
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
     const expires = new Date(Date.now() + 3600 * 1000); // 1 hour
 
+    // Store the HASHED token in the DB — raw token is only ever in the email link.
+    // This matches the pattern used in lib/tokens.ts for email verification.
     await prisma.verificationToken.upsert({
-      where: { identifier_token: { identifier: email, token: resetToken } },
+      where: { identifier_token: { identifier: email, token: hashedToken } },
       update: { expires },
       create: {
         identifier: email,
-        token: resetToken,
+        token: hashedToken,
         expires,
       },
     });
 
+    // Send the RAW token in the email link (never the hash)
     const emailResult = await sendPasswordResetEmail({
       to: email,
-      token: resetToken,
+      token: rawToken,
     });
 
     if (!emailResult.success) {
@@ -70,7 +77,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       message: "If an account exists, password reset instructions have been sent.",
-      debugToken: process.env.NODE_ENV === "development" ? resetToken : undefined,
+      debugToken: process.env.NODE_ENV === "development" ? rawToken : undefined,
     });
   } catch (error) {
     console.error("Forgot Password Error:", error);

@@ -20,7 +20,8 @@ export const authConfig: NextAuthConfig = {
       if (trigger === "update" && session) {
         if (session.name) token.name = session.name;
         if (session.image) token.picture = session.image;
-        if (session.role) token.role = session.role;
+        // Role MUST NOT be updatable by the client — only the DB is authoritative.
+        // To reflect a role change, the user must re-authenticate.
       }
       return token;
     },
